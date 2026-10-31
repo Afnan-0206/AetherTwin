@@ -332,189 +332,201 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
   };
 
   return (
-    <div className="flex flex-col h-full bg-graphite-900 border border-graphite-800/60 rounded-lg overflow-hidden">
+    <div className="flex flex-col h-full bg-graphite-900 border border-graphite-800/60 rounded-xl overflow-hidden shadow-sm">
       {/* Titlebar & Segmented Navigation Tabs */}
-      <div className="flex flex-wrap items-center justify-between px-3 py-2 bg-[#0f1219] border-b border-graphite-800/60 gap-1.5">
-        <div className="flex items-center gap-1.5 shrink-0">
-          <LineChart className="w-3.5 h-3.5 text-blue-400" />
-          <span className="font-mono text-xs font-semibold text-graphite-100 tracking-tight whitespace-nowrap">
-            VALIDATION & RESIDUALS
+      <div className="flex flex-wrap items-center justify-between px-3.5 py-2 bg-[#0c0e15] border-b border-graphite-800/60 gap-1.5">
+        <div className="flex items-center gap-2 shrink-0">
+          <LineChart className="w-4 h-4 text-blue-400" />
+          <span className="text-xs font-semibold text-slate-100 tracking-tight whitespace-nowrap">
+            Validation & Residuals
           </span>
           {fittedParameters?.dragModel && (
-            <span className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-blue-950/40 text-blue-300 border border-blue-500/20 text-[9px] font-mono">
+            <span className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[10px] font-mono">
               {fittedParameters.dragModel.replace('_', ' ').toUpperCase()}
             </span>
           )}
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex items-center gap-1 font-mono text-[10px] shrink-0 overflow-x-auto">
+        <div className="flex items-center gap-1 text-xs shrink-0 overflow-x-auto scrollbar-none py-0.5">
           <button
             onClick={() => setActiveTab('charts')}
-            className={`px-2 py-0.5 rounded transition ${
+            className={`px-2 py-1 rounded-md transition text-xs flex items-center gap-1 font-medium ${
               activeTab === 'charts'
-                ? 'bg-graphite-750 text-graphite-100 border border-graphite-700 font-semibold'
-                : 'text-graphite-400 hover:text-graphite-200'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-graphite-400 hover:text-slate-200 hover:bg-graphite-850'
             }`}
           >
-            TRAJECTORY
+            <span>Trajectory</span>
           </button>
           <button
             onClick={() => setActiveTab('phase')}
-            className={`px-2 py-0.5 rounded transition flex items-center gap-1 ${
+            className={`px-2 py-1 rounded-md transition flex items-center gap-1 text-xs font-medium ${
               activeTab === 'phase'
-                ? 'bg-indigo-950/40 text-indigo-300 border border-indigo-500/30 font-semibold'
-                : 'text-graphite-400 hover:text-graphite-200'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-graphite-400 hover:text-slate-200 hover:bg-graphite-850'
             }`}
           >
-            <Compass className="w-2.5 h-2.5 text-indigo-400" />
-            <span>PHASE</span>
+            <Compass className="w-3 h-3" />
+            <span>Phase</span>
           </button>
           <button
             onClick={() => setActiveTab('energy')}
-            className={`px-2 py-0.5 rounded transition flex items-center gap-1 ${
+            className={`px-2 py-1 rounded-md transition flex items-center gap-1 text-xs font-medium ${
               activeTab === 'energy'
-                ? 'bg-cyan-950/40 text-cyan-300 border border-cyan-500/30 font-semibold'
-                : 'text-graphite-400 hover:text-graphite-200'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-graphite-400 hover:text-slate-200 hover:bg-graphite-850'
             }`}
           >
-            <Zap className="w-2.5 h-2.5 text-cyan-400" />
-            <span>ENERGY</span>
+            <Zap className="w-3 h-3" />
+            <span>Energy</span>
           </button>
           <button
             onClick={() => setActiveTab('spectrum')}
-            className={`px-2 py-0.5 rounded transition flex items-center gap-1 ${
+            className={`px-2 py-1 rounded-md transition flex items-center gap-1 text-xs font-medium ${
               activeTab === 'spectrum'
-                ? 'bg-teal-950/40 text-teal-300 border border-teal-500/30 font-semibold'
-                : 'text-graphite-400 hover:text-graphite-200'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-graphite-400 hover:text-slate-200 hover:bg-graphite-850'
             }`}
           >
-            <Waves className="w-2.5 h-2.5 text-teal-400" />
+            <Waves className="w-3 h-3" />
             <span>FFT</span>
           </button>
           <button
             onClick={() => setActiveTab('chaos')}
-            className={`px-2 py-0.5 rounded transition flex items-center gap-1 ${
+            className={`px-2 py-1 rounded-md transition flex items-center gap-1 text-xs font-medium ${
               activeTab === 'chaos'
-                ? 'bg-purple-950/40 text-purple-300 border border-purple-500/30 font-semibold'
-                : 'text-graphite-400 hover:text-graphite-200'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-graphite-400 hover:text-slate-200 hover:bg-graphite-850'
             }`}
           >
-            <Flame className="w-2.5 h-2.5 text-amber-400" />
-            <span>CHAOS</span>
+            <Flame className="w-3 h-3" />
+            <span>Chaos</span>
           </button>
           <button
             onClick={() => setActiveTab('control')}
-            className={`px-2 py-0.5 rounded transition flex items-center gap-1 ${
+            className={`px-2 py-1 rounded-md transition flex items-center gap-1 text-xs font-medium ${
               activeTab === 'control'
-                ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-500/30 font-semibold'
-                : 'text-graphite-400 hover:text-graphite-200'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-graphite-400 hover:text-slate-200 hover:bg-graphite-850'
             }`}
           >
-            <Navigation className="w-2.5 h-2.5 text-emerald-400" />
-            <span>CONTROL</span>
+            <Navigation className="w-3 h-3" />
+            <span>Control</span>
           </button>
           <button
             onClick={() => setActiveTab('diagnostics')}
-            className={`px-2 py-0.5 rounded transition flex items-center gap-1 ${
+            className={`px-2 py-1 rounded-md transition flex items-center gap-1 text-xs font-medium ${
               activeTab === 'diagnostics'
-                ? 'bg-amber-950/40 text-amber-300 border border-amber-500/30 font-semibold'
-                : 'text-graphite-400 hover:text-graphite-200'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-graphite-400 hover:text-slate-200 hover:bg-graphite-850'
             }`}
           >
-            <Sparkles className="w-2.5 h-2.5 text-amber-400" />
-            <span>MUSE SPARK</span>
+            <Sparkles className="w-3 h-3" />
+            <span>Copilot</span>
           </button>
           <button
             onClick={() => setActiveTab('export')}
-            className={`px-2 py-0.5 rounded transition flex items-center gap-1 ${
+            className={`px-2 py-1 rounded-md transition flex items-center gap-1 text-xs font-medium ${
               activeTab === 'export'
-                ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-500/30 font-semibold'
-                : 'text-graphite-400 hover:text-graphite-200'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-graphite-400 hover:text-slate-200 hover:bg-graphite-850'
             }`}
           >
-            <Download className="w-2.5 h-2.5 text-emerald-400" />
-            <span>EXPORT</span>
+            <Download className="w-3 h-3" />
+            <span>Export</span>
           </button>
           <button
             onClick={() => setActiveTab('provenance')}
-            className={`px-2 py-0.5 rounded transition flex items-center gap-1 ${
+            className={`px-2 py-1 rounded-md transition flex items-center gap-1 text-xs font-medium ${
               activeTab === 'provenance'
-                ? 'bg-graphite-750 text-graphite-100 border border-graphite-700 font-semibold'
-                : 'text-graphite-400 hover:text-graphite-200'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-graphite-400 hover:text-slate-200 hover:bg-graphite-850'
             }`}
           >
-            <Layers className="w-2.5 h-2.5 text-graphite-400" />
-            <span>AUDIT ({provenanceLog.length})</span>
+            <Layers className="w-3 h-3" />
+            <span>Audit</span>
           </button>
         </div>
       </div>
 
       {/* Main Content View */}
       <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5">
-        {/* KPI Metric Strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono">
-          <div className="p-2 rounded bg-graphite-850 border border-graphite-800">
-            <div className="text-[9px] text-graphite-400 flex items-center justify-between">
-              <span>HOLDOUT RMSE</span>
-              <span className="text-amber-400 font-semibold">30% UNSEEN</span>
+        {/* KPI Metric Grid (2x2 Balanced Cards - No Text Clipping or Overlap) */}
+        <div className="grid grid-cols-2 gap-2.5">
+          {/* Card 1: Holdout RMSE */}
+          <div className="p-3 rounded-xl bg-graphite-850/80 border border-graphite-800 flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-1 text-xs">
+              <span className="text-graphite-400 font-medium">Holdout RMSE</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/25 font-semibold">
+                30% Unseen
+              </span>
             </div>
-            <div className="text-sm font-bold text-amber-300 mt-0.5 tabular-nums">
+            <div className="text-xl font-bold text-amber-300 font-mono tabular-nums my-1">
               {metrics.holdoutRmseDeg.toFixed(2)}°
             </div>
-            <div className="text-[9px] text-graphite-500 mt-0.5 tabular-nums">
-              MAE: {metrics.holdoutMaeDeg.toFixed(2)}°
+            <div className="text-[11px] text-graphite-400 flex items-center justify-between">
+              <span>MAE: <span className="font-mono tabular-nums">{metrics.holdoutMaeDeg.toFixed(2)}°</span></span>
+              <span className="text-graphite-500 text-[10px]">Unseen Ground Truth</span>
             </div>
           </div>
 
-          <div className="p-2 rounded bg-graphite-850 border border-graphite-800">
-            <div className="text-[9px] text-graphite-400 flex items-center justify-between">
-              <span>TRAIN FIT RMSE</span>
-              <span className="text-emerald-400 font-semibold">70% FITTED</span>
+          {/* Card 2: Train Fit RMSE */}
+          <div className="p-3 rounded-xl bg-graphite-850/80 border border-graphite-800 flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-1 text-xs">
+              <span className="text-graphite-400 font-medium">Train Fit RMSE</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 font-semibold">
+                70% Fitted
+              </span>
             </div>
-            <div className="text-sm font-bold text-emerald-400 mt-0.5 tabular-nums">
+            <div className="text-xl font-bold text-emerald-400 font-mono tabular-nums my-1">
               {metrics.trainRmseDeg.toFixed(2)}°
             </div>
-            <div className="text-[9px] text-graphite-500 mt-0.5 tabular-nums">
-              MAE: {metrics.trainMaeDeg.toFixed(2)}°
+            <div className="text-[11px] text-graphite-400 flex items-center justify-between">
+              <span>MAE: <span className="font-mono tabular-nums">{metrics.trainMaeDeg.toFixed(2)}°</span></span>
+              <span className="text-graphite-500 text-[10px]">Deterministic RK4</span>
             </div>
           </div>
 
-          <div className="p-2 rounded bg-graphite-850 border border-graphite-800">
-            <div className="text-[9px] text-graphite-400 flex items-center justify-between">
-              <span>BASELINE RMSE</span>
-              <span className="text-graphite-500">PERSISTENCE</span>
+          {/* Card 3: Baseline Drift */}
+          <div className="p-3 rounded-xl bg-graphite-850/80 border border-graphite-800 flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-1 text-xs">
+              <span className="text-graphite-400 font-medium">Baseline Drift</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-graphite-800 text-graphite-400 border border-graphite-700 font-medium">
+                Persistence
+              </span>
             </div>
-            <div className="text-sm font-bold text-graphite-300 mt-0.5 tabular-nums">
+            <div className="text-xl font-bold text-slate-200 font-mono tabular-nums my-1">
               {metrics.baselineHoldoutRmseDeg.toFixed(2)}°
             </div>
-            <div className="text-[9px] text-graphite-500 mt-0.5">
-              Constant Velocity
+            <div className="text-[11px] text-graphite-400">
+              Constant Velocity Baseline
             </div>
           </div>
 
-          <div className="p-2 rounded bg-blue-950/20 border border-blue-500/20">
-            <div className="text-[9px] text-blue-400 flex items-center justify-between">
-              <span>ERROR REDUCTION</span>
-              <TrendingUp className="w-2.5 h-2.5 text-blue-400" />
+          {/* Card 4: Error Reduction */}
+          <div className="p-3 rounded-xl bg-emerald-950/20 border border-emerald-500/25 flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-1 text-xs">
+              <span className="text-emerald-300 font-medium">Error Reduction</span>
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
             </div>
-            <div className="text-sm font-bold text-blue-300 mt-0.5 tabular-nums">
+            <div className="text-xl font-bold text-emerald-400 font-mono tabular-nums my-1">
               -{metrics.errorReductionPercent.toFixed(1)}%
             </div>
-            <div className="text-[9px] text-blue-400/70 mt-0.5">
-              vs naive persistence
+            <div className="text-[11px] text-emerald-400/80">
+              vs unmodeled persistence
             </div>
           </div>
         </div>
 
         {/* Confidence Interval Strip */}
         {fittedParameters && (
-          <div className="flex flex-wrap items-center gap-2 p-2 rounded bg-graphite-850/80 border border-graphite-800 text-[10px] font-mono text-graphite-300">
-            <span className="text-graphite-500 uppercase tracking-wider text-[9px]">PARAMETERS (±1σ):</span>
-            <span className="px-1.5 py-0.5 rounded bg-graphite-800 border border-graphite-750">
+          <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-graphite-850/60 border border-graphite-800 text-xs">
+            <span className="text-graphite-400 font-medium text-[11px]">Identified Parameters (±1σ):</span>
+            <span className="px-2 py-0.5 rounded-md bg-graphite-800 border border-graphite-750 font-mono text-[11px] text-slate-200">
               ω₀² = {fittedParameters.omega0Sq} {fittedParameters.omega0SqUncertainty ? `± ${fittedParameters.omega0SqUncertainty}` : ''} s⁻²
             </span>
-            <span className="px-1.5 py-0.5 rounded bg-graphite-800 border border-graphite-750">
+            <span className="px-2 py-0.5 rounded-md bg-graphite-800 border border-graphite-750 font-mono text-[11px] text-slate-200">
               c₁ = {fittedParameters.damping} {fittedParameters.dampingUncertainty ? `± ${fittedParameters.dampingUncertainty}` : ''} s⁻¹
             </span>
             {fittedParameters.dampingQuadratic && (
@@ -545,23 +557,21 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
         {/* TAB 1: TRAJECTORY & RESIDUALS */}
         {activeTab === 'charts' && (
           <>
-            <div className="rounded bg-graphite-850 border border-graphite-800 p-2.5">
-              <div className="flex items-center justify-between mb-1.5 font-mono text-[10px]">
-                <div className="flex items-center gap-3">
-                  <span className="text-graphite-300 font-semibold">
-                    MEASURED vs DIGITAL TWIN TRAJECTORY
+            <div className="rounded-xl bg-graphite-850/80 border border-graphite-800 p-3">
+              <div className="flex items-center justify-between mb-2 text-xs">
+                <span className="text-slate-200 font-semibold tracking-tight">
+                  Measured vs Digital Twin Trajectory
+                </span>
+                <div className="flex items-center gap-3 text-[11px]">
+                  <span className="flex items-center gap-1.5 text-blue-400 font-medium">
+                    <span className="w-2.5 h-0.5 bg-blue-400 inline-block rounded-full" /> Measured θ
                   </span>
-                  <div className="flex items-center gap-2 text-[9px]">
-                    <span className="flex items-center gap-1 text-blue-400">
-                      <span className="w-2 h-0.5 bg-blue-400 inline-block" /> Measured θ
-                    </span>
-                    <span className="flex items-center gap-1 text-emerald-400">
-                      <span className="w-2 h-0.5 bg-emerald-400 inline-block" /> RK4 Twin
-                    </span>
-                    <span className="flex items-center gap-1 text-slate-500">
-                      <span className="w-2 h-0.5 bg-slate-500 inline-block border-t border-dashed" /> Baseline
-                    </span>
-                  </div>
+                  <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
+                    <span className="w-2.5 h-0.5 bg-emerald-400 inline-block rounded-full" /> RK4 Twin
+                  </span>
+                  <span className="flex items-center gap-1.5 text-slate-400 font-medium">
+                    <span className="w-2.5 h-0.5 bg-slate-500 inline-block border-t border-dashed" /> Baseline Drift
+                  </span>
                 </div>
               </div>
 
@@ -700,12 +710,14 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
               </div>
             </div>
 
-            <div className="rounded bg-graphite-850 border border-graphite-800 p-2.5">
-              <div className="flex items-center justify-between mb-1.5 font-mono text-[10px]">
-                <span className="text-graphite-300 font-semibold">
-                  INSTANTANEOUS RESIDUAL CORRIDOR (Δθ = θ_pred - θ_meas)
+            <div className="rounded-xl bg-graphite-850/80 border border-graphite-800 p-3">
+              <div className="flex items-center justify-between mb-2 text-xs">
+                <span className="text-slate-200 font-semibold tracking-tight">
+                  Instantaneous Residual Corridor (Δθ = θ_pred - θ_meas)
                 </span>
-                <span className="text-graphite-400">Max Error: ±{maxAbsRes}°</span>
+                <span className="text-graphite-400 font-mono text-[11px] tabular-nums">
+                  Max Error: ±{maxAbsRes}°
+                </span>
               </div>
               <div className="relative w-full aspect-[620/105]">
                 <svg

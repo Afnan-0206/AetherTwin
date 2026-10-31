@@ -134,3 +134,4 @@ export const TWIN_ARCHETYPES: Record<TwinArchetypeId, TwinArchetype> = {
     disturbanceMagnitude: 30.0
   }
 };
+

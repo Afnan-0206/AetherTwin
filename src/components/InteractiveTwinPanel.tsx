@@ -1286,23 +1286,23 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
   const kineticPercent = Math.min(100, (simState.kinetic / maxBarEnergy) * 100);
 
   return (
-    <div className="flex flex-col h-full bg-graphite-900 border border-graphite-800/60 rounded-lg overflow-hidden">
+    <div className="flex flex-col h-full bg-graphite-900 border border-graphite-800/60 rounded-xl overflow-hidden shadow-sm">
       {/* Titlebar with Mechanism Mode & Cyber-Physical Archetypes */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between px-3 py-2 bg-[#0f1219] border-b border-graphite-800/60 gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between px-3.5 py-2.5 bg-[#0c0e15] border-b border-graphite-800/60 gap-2">
         <div className="flex items-center gap-2">
-          <Activity className="w-3.5 h-3.5 text-blue-400" />
-          <span className="font-mono text-xs font-semibold text-graphite-100 tracking-tight">
-            CYBER-PHYSICAL SANDBOX
+          <Activity className="w-4 h-4 text-blue-400" />
+          <span className="text-xs font-semibold text-slate-100 tracking-tight">
+            Cyber-Physical Sandbox
           </span>
           <ProvenanceBadge kind="CALCULATED" text="LQR CARE SOLVER" />
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5 font-mono text-[10px]">
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
           {/* Cyber-Physical Archetype Selector */}
           <select
             value={archetype}
             onChange={(e) => handleSelectArchetype(e.target.value as TwinArchetypeId)}
-            className="bg-graphite-900 border border-graphite-750 text-slate-200 rounded px-2 py-0.5 text-[10px] font-mono focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm"
+            className="bg-graphite-900 border border-graphite-750 text-slate-200 rounded-lg px-2.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm cursor-pointer"
             title="Select Cyber-Physical Industrial Archetype"
           >
             <option value="single_pendulum">🔬 Lab Single Twin (SAM 3.1)</option>
@@ -1316,52 +1316,52 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
           {/* Quick Disturbance Impulse Button */}
           <button
             onClick={handleInjectDisturbance}
-            className="px-2 py-0.5 rounded bg-amber-950/40 hover:bg-amber-900/40 text-amber-300 border border-amber-500/30 text-[10px] flex items-center gap-1 transition"
+            className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 text-xs flex items-center gap-1 transition"
             title="Inject physical disturbance impulse"
           >
-            <Wind className="w-2.5 h-2.5 text-amber-400" />
+            <Wind className="w-3 h-3 text-amber-400" />
             <span className="hidden sm:inline">Disturbance</span>
           </button>
 
           {/* EKF State Observer Toggle */}
           <button
             onClick={() => setIsKalmanActive(!isKalmanActive)}
-            className={`px-2 py-0.5 rounded text-[10px] flex items-center gap-1 transition border ${
+            className={`px-2 py-1 rounded-lg text-xs flex items-center gap-1 transition border ${
               isKalmanActive
-                ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/50 font-semibold'
-                : 'bg-graphite-850 text-graphite-400 border-graphite-750 hover:text-graphite-200'
+                ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 font-medium'
+                : 'bg-graphite-850 text-graphite-400 border-graphite-750 hover:text-slate-200'
             }`}
             title="Toggle real-time Extended Kalman Filter state observer"
           >
-            <Radio className="w-2.5 h-2.5 text-emerald-400" />
+            <Radio className="w-3 h-3 text-emerald-400" />
             <span>EKF</span>
           </button>
 
           {/* Simulated Sensor Noise Toggle */}
           <button
             onClick={() => setIsNoiseActive(!isNoiseActive)}
-            className={`px-2 py-0.5 rounded text-[10px] flex items-center gap-1 transition border ${
+            className={`px-2 py-1 rounded-lg text-xs flex items-center gap-1 transition border ${
               isNoiseActive
-                ? 'bg-rose-950/60 text-rose-300 border-rose-500/50 font-semibold'
-                : 'bg-graphite-850 text-graphite-400 border-graphite-750 hover:text-graphite-200'
+                ? 'bg-rose-500/15 text-rose-300 border-rose-500/30 font-medium'
+                : 'bg-graphite-850 text-graphite-400 border-graphite-750 hover:text-slate-200'
             }`}
             title="Simulate optical camera noise / tracking jitter"
           >
-            <Zap className="w-2.5 h-2.5 text-rose-400" />
+            <Zap className="w-3 h-3 text-rose-400" />
             <span className="hidden sm:inline">Noise</span>
           </button>
 
           {/* Phase Plane Orbit Toggle */}
           <button
             onClick={() => setShowPhasePortrait(!showPhasePortrait)}
-            className={`px-2 py-0.5 rounded text-[10px] flex items-center gap-1 transition border ${
+            className={`px-2 py-1 rounded-lg text-xs flex items-center gap-1 transition border ${
               showPhasePortrait
-                ? 'bg-cyan-950/60 text-cyan-300 border-cyan-500/50 font-semibold'
-                : 'bg-graphite-850 text-graphite-400 border-graphite-750 hover:text-graphite-200'
+                ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30 font-medium'
+                : 'bg-graphite-850 text-graphite-400 border-graphite-750 hover:text-slate-200'
             }`}
             title="Toggle real-time Phase Plane orbit display [θ vs ω]"
           >
-            <Orbit className="w-2.5 h-2.5 text-cyan-400" />
+            <Orbit className="w-3 h-3 text-cyan-400" />
             <span className="hidden sm:inline">Phase</span>
           </button>
         </div>
@@ -1373,7 +1373,7 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
           ref={canvasRef}
           width={620}
           height={320}
-          className="max-h-full max-w-full aspect-[620/320] object-contain rounded border border-graphite-800/80 cursor-grab active:cursor-grabbing touch-none select-none"
+          className="max-h-full max-w-full aspect-[620/320] object-contain rounded-lg border border-graphite-800/80 cursor-grab active:cursor-grabbing touch-none select-none"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
@@ -1382,168 +1382,164 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
 
         {/* Drag Hint Tooltip */}
         {!hasInteracted && !dragState.isDragging && (
-          <div className="absolute bottom-12 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-graphite-900/90 border border-graphite-700/70 text-[10px] font-mono text-graphite-300 pointer-events-none flex items-center gap-1.5 shadow-lg backdrop-blur-sm animate-pulse">
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-graphite-900/90 border border-graphite-750 text-xs text-graphite-300 pointer-events-none flex items-center gap-1.5 shadow-lg backdrop-blur-sm animate-pulse">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
             <span>Click & drag bob to set angle</span>
           </div>
         )}
+      </div>
 
-        {/* Telemetry Strip Overlay */}
+      {/* Telemetry Status Ribbon */}
+      <div className="px-3.5 py-2 bg-[#0b0e15] border-t border-graphite-800/60 flex items-center justify-between text-xs font-mono">
         {mechanism === 'single' ? (
-          <div className="absolute top-3 left-3 p-2 rounded bg-graphite-950/90 backdrop-blur-sm border border-graphite-800 font-mono text-[11px] space-y-1 shadow-sm pointer-events-none">
-            <div className="flex items-center justify-between gap-4 text-graphite-400 text-[10px]">
-              <span>TWIN ANGLE θ</span>
-              <span className="text-blue-300 font-semibold tabular-nums">
-                {radToDeg(activeTheta).toFixed(2)}°
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-4 text-graphite-400 text-[10px]">
-              <span>ANGULAR VELOCITY ω</span>
-              <span className="text-emerald-400 font-semibold tabular-nums">
-                {simState.omega.toFixed(2)} rad/s
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-4 text-graphite-400 text-[10px]">
-              <span>TOTAL ENERGY</span>
-              <span className="text-cyan-400 font-semibold tabular-nums">
-                {simState.total.toFixed(3)} J
-              </span>
-            </div>
-          </div>
-        ) : mechanism === 'double' ? (
-          <div className="absolute top-3 left-3 p-2 rounded bg-graphite-950/90 backdrop-blur-sm border border-graphite-800 font-mono text-[11px] space-y-1 shadow-sm pointer-events-none">
-            <div className="flex items-center justify-between gap-4 text-graphite-400 text-[10px]">
-              <span>ARM 1 θ₁</span>
-              <span className="text-blue-300 font-semibold tabular-nums">
-                {radToDeg(doubleState.th1).toFixed(1)}°
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-4 text-graphite-400 text-[10px]">
-              <span>ARM 2 θ₂</span>
-              <span className="text-purple-300 font-semibold tabular-nums">
-                {radToDeg(doubleState.th2).toFixed(1)}°
-              </span>
-            </div>
-            {doubleState.th1B !== undefined && (
-              <div className="flex items-center justify-between gap-4 text-amber-400 text-[10px]">
-                <span>CHAOS DIVERGENCE</span>
-                <span className="font-bold tabular-nums">
-                  {doubleState.divergenceDeg}°
+          <>
+            <div className="flex items-center gap-3">
+              <span className="text-graphite-400">
+                θ:{' '}
+                <span className="text-blue-300 font-semibold tabular-nums">
+                  {radToDeg(activeTheta).toFixed(2)}°
                 </span>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="absolute top-3 left-3 p-2 rounded bg-graphite-950/90 backdrop-blur-sm border border-emerald-500/30 font-mono text-[11px] space-y-1 shadow-sm pointer-events-none">
-            <div className="flex items-center justify-between gap-4 text-graphite-400 text-[10px]">
-              <span>CART POSITION x</span>
-              <span className="text-emerald-400 font-semibold tabular-nums">
-                {cartPoleState.x.toFixed(3)} m
+              </span>
+              <span className="text-graphite-400">
+                ω:{' '}
+                <span className="text-emerald-400 font-semibold tabular-nums">
+                  {simState.omega.toFixed(2)} rad/s
+                </span>
+              </span>
+              <span className="text-graphite-400">
+                E:{' '}
+                <span className="text-cyan-400 font-semibold tabular-nums">
+                  {simState.total.toFixed(3)} J
+                </span>
               </span>
             </div>
-            <div className="flex items-center justify-between gap-4 text-graphite-400 text-[10px]">
-              <span>BOOSTER TILT θ</span>
-              <span className="text-cyan-400 font-semibold tabular-nums">
-                {radToDeg(cartPoleState.theta).toFixed(2)}°
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-4 text-graphite-400 text-[10px]">
-              <span>LQR FORCE u</span>
-              <span className="text-amber-400 font-bold tabular-nums">
-                {cartPoleState.u > 0 ? '+' : ''}{cartPoleState.u.toFixed(2)} N
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-4 text-graphite-400 text-[10px]">
-              <span>LQR GAIN K</span>
-              <span className="text-graphite-300 tabular-nums text-[9px]">
-                [{lqrModel.K.map((k) => Math.round(k)).join(', ')}]
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Live / Video Sync Controls */}
-        <div className="absolute top-3 right-3 flex items-center gap-1.5 font-mono text-[10px]">
-          {mechanism === 'single' ? (
             <button
               onClick={onToggleSync}
-              className={`px-2 py-1 rounded border transition flex items-center gap-1 ${
+              className={`px-2 py-0.5 rounded text-[11px] font-sans border transition flex items-center gap-1 ${
                 isSyncedWithVideo
-                  ? 'bg-blue-950/60 border-blue-500/40 text-blue-300'
-                  : 'bg-graphite-850 border-graphite-750 text-graphite-400'
+                  ? 'bg-blue-500/15 border-blue-500/30 text-blue-300 font-medium'
+                  : 'bg-graphite-800 border-graphite-750 text-graphite-400'
               }`}
             >
-              <RefreshCw className="w-2.5 h-2.5" />
-              <span>{isSyncedWithVideo ? 'SYNCED TO VIDEO' : 'FREE SANDBOX'}</span>
+              <RefreshCw className="w-3 h-3" />
+              <span>{isSyncedWithVideo ? 'Synced to Video' : 'Free Sandbox'}</span>
             </button>
-          ) : mechanism === 'double' ? (
+          </>
+        ) : mechanism === 'double' ? (
+          <>
+            <div className="flex items-center gap-3">
+              <span className="text-graphite-400">
+                θ₁:{' '}
+                <span className="text-blue-300 font-semibold tabular-nums">
+                  {radToDeg(doubleState.th1).toFixed(1)}°
+                </span>
+              </span>
+              <span className="text-graphite-400">
+                θ₂:{' '}
+                <span className="text-purple-300 font-semibold tabular-nums">
+                  {radToDeg(doubleState.th2).toFixed(1)}°
+                </span>
+              </span>
+              {doubleState.th1B !== undefined && (
+                <span className="text-graphite-400">
+                  Δ:{' '}
+                  <span className="text-amber-400 font-bold tabular-nums">
+                    {doubleState.divergenceDeg}°
+                  </span>
+                </span>
+              )}
+            </div>
             <button
               onClick={triggerChaosPerturbation}
-              className="px-2 py-1 rounded bg-purple-950/60 border border-purple-500/40 text-purple-300 hover:bg-purple-900/60 transition flex items-center gap-1 font-semibold"
+              className="px-2 py-0.5 rounded bg-purple-500/15 border border-purple-500/30 text-purple-300 hover:bg-purple-500/25 transition flex items-center gap-1 text-[11px] font-sans font-medium"
               title="Add delta0 = 0.0001 rad perturbation to observe exponential divergence"
             >
-              <Shuffle className="w-2.5 h-2.5 text-purple-400" />
+              <Shuffle className="w-3 h-3 text-purple-400" />
               <span>Perturb +0.0001 rad</span>
             </button>
-          ) : (
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-3">
+              <span className="text-graphite-400">
+                x:{' '}
+                <span className="text-emerald-400 font-semibold tabular-nums">
+                  {cartPoleState.x.toFixed(3)}m
+                </span>
+              </span>
+              <span className="text-graphite-400">
+                θ:{' '}
+                <span className="text-cyan-400 font-semibold tabular-nums">
+                  {radToDeg(cartPoleState.theta).toFixed(2)}°
+                </span>
+              </span>
+              <span className="text-graphite-400">
+                u:{' '}
+                <span className="text-amber-400 font-bold tabular-nums">
+                  {cartPoleState.u > 0 ? '+' : ''}{cartPoleState.u.toFixed(2)}N
+                </span>
+              </span>
+            </div>
             <button
               onClick={() => setLqrWindImpulse((w) => w + 14.0)}
-              className="px-2 py-1 rounded bg-amber-950/60 border border-amber-500/40 text-amber-300 hover:bg-amber-900/60 transition flex items-center gap-1 font-semibold"
+              className="px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:bg-amber-500/25 transition flex items-center gap-1 text-[11px] font-sans font-medium"
               title="Apply lateral +14N wind disturbance blast"
             >
-              <Wind className="w-2.5 h-2.5 text-amber-400" />
+              <Wind className="w-3 h-3 text-amber-400" />
               <span>Wind Gust +14N</span>
             </button>
-          )}
-        </div>
-
-        {/* Energy Bar Gauges (Single Pendulum) */}
-        {mechanism === 'single' && (
-          <div className="absolute bottom-3 left-3 right-3 p-2 rounded bg-graphite-950/85 backdrop-blur-sm border border-graphite-800/80 font-mono text-[10px] space-y-1">
-            <div className="flex justify-between text-graphite-400 text-[9px]">
-              <span>MECHANICAL ENERGY PARTITION</span>
-              <span className="text-graphite-300 tabular-nums">{simState.total.toFixed(3)} J Total</span>
-            </div>
-            <div className="w-full h-1.5 bg-graphite-800 rounded overflow-hidden flex">
-              <div
-                style={{ width: `${potentialPercent}%` }}
-                className="bg-emerald-500 transition-all duration-75"
-                title={`Potential: ${simState.potential.toFixed(3)} J`}
-              />
-              <div
-                style={{ width: `${kineticPercent}%` }}
-                className="bg-blue-500 transition-all duration-75"
-                title={`Kinetic: ${simState.kinetic.toFixed(3)} J`}
-              />
-            </div>
-            <div className="flex justify-between text-[9px]">
-              <span className="text-emerald-400 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                V: {simState.potential.toFixed(3)} J
-              </span>
-              <span className="text-blue-400 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-                T: {simState.kinetic.toFixed(3)} J
-              </span>
-            </div>
-          </div>
+          </>
         )}
       </div>
 
+      {/* Mechanical Energy Partition Bar (Single Pendulum) */}
+      {mechanism === 'single' && (
+        <div className="px-3.5 py-1.5 bg-[#0e111a] border-t border-graphite-800/40 flex flex-col gap-1 select-none">
+          <div className="flex justify-between text-graphite-400 text-[10px]">
+            <span className="font-sans font-medium">Mechanical Energy Partition</span>
+            <span className="font-mono text-graphite-300 tabular-nums">
+              {simState.total.toFixed(3)} J Total
+            </span>
+          </div>
+          <div className="w-full h-1.5 bg-graphite-800 rounded-full overflow-hidden flex">
+            <div
+              style={{ width: `${potentialPercent}%` }}
+              className="bg-emerald-500 transition-all duration-75"
+              title={`Potential: ${simState.potential.toFixed(3)} J`}
+            />
+            <div
+              style={{ width: `${kineticPercent}%` }}
+              className="bg-blue-500 transition-all duration-75"
+              title={`Kinetic: ${simState.kinetic.toFixed(3)} J`}
+            />
+          </div>
+          <div className="flex justify-between text-[10px] font-mono">
+            <span className="text-emerald-400 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              V: {simState.potential.toFixed(3)} J ({Math.round(potentialPercent)}%)
+            </span>
+            <span className="text-blue-400 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+              T: {simState.kinetic.toFixed(3)} J ({Math.round(kineticPercent)}%)
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Counterfactual Parameter Controls Section */}
-      <div className="p-3.5 bg-[#0f1219] border-t border-graphite-800/60 flex flex-col gap-2.5 font-mono text-xs select-none">
+      <div className="p-3.5 bg-[#0c0e15] border-t border-graphite-800/60 flex flex-col gap-2.5 text-xs select-none">
         <div className="flex items-center justify-between">
-          <span className="text-graphite-200 font-semibold flex items-center gap-1.5 text-[11px]">
-            <Sliders className="w-3 h-3 text-blue-400" />
+          <span className="text-slate-200 font-medium flex items-center gap-1.5">
+            <Sliders className="w-3.5 h-3.5 text-blue-400" />
             {mechanism === 'single'
-              ? 'COUNTERFACTUAL CONTROLS'
+              ? 'Counterfactual Physics'
               : mechanism === 'double'
-              ? 'DOUBLE PENDULUM PARAMETERS'
-              : 'ROCKET LANDING LQR PARAMETERS'}
+              ? 'Double Pendulum Parameters'
+              : 'LQR Optimal Control Parameters'}
           </span>
           <button
             onClick={handleResetToFitted}
-            className="text-[11px] text-blue-400 hover:text-blue-300 flex items-center gap-1 transition"
+            className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition"
           >
             <RotateCcw className="w-3 h-3" />
             <span>Reset to Fitted</span>

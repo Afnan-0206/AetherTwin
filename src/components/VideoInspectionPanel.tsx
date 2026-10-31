@@ -415,21 +415,74 @@ export const VideoInspectionPanel: React.FC<VideoInspectionPanelProps> = ({
   ]);
 
   return (
-    <div className="flex flex-col h-full bg-graphite-900 border border-graphite-800/60 rounded-lg overflow-hidden">
-      {/* Panel Titlebar */}
-      <div className="flex items-center justify-between px-3.5 py-2 bg-[#0f1219] border-b border-graphite-800/60">
+    <div className="flex flex-col h-full bg-graphite-900 border border-graphite-800/60 rounded-xl overflow-hidden shadow-sm">
+      {/* Panel Header */}
+      <div className="flex items-center justify-between px-3.5 py-2.5 bg-[#0c0e15] border-b border-graphite-800/60">
         <div className="flex items-center gap-2">
-          <Video className="w-3.5 h-3.5 text-blue-400" />
-          <span className="font-mono text-xs font-semibold text-graphite-100 tracking-tight">
-            OPTICAL SEGMENTATION
+          <Video className="w-4 h-4 text-blue-400" />
+          <span className="text-xs font-semibold text-slate-100 tracking-tight">
+            Optical Segmentation
           </span>
           <ProvenanceBadge kind="OBSERVED" text="RAW EVIDENCE" />
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Toolbar & Layer Toggles */}
+        <div className="flex items-center gap-1.5">
+          {/* Layer Visibility Toggles */}
+          <div className="flex items-center p-0.5 rounded-lg bg-graphite-950/80 border border-graphite-800/80">
+            <button
+              onClick={() => setShowGhostTwin(!showGhostTwin)}
+              className={`p-1 rounded-md transition text-xs flex items-center gap-1 ${
+                showGhostTwin
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                  : 'text-graphite-500 hover:text-graphite-300'
+              }`}
+              title="Toggle Ghost RK4 Digital Twin overlay"
+            >
+              <Ghost className="w-3.5 h-3.5" />
+              <span className="text-[10px] hidden sm:inline font-mono">Ghost</span>
+            </button>
+            <button
+              onClick={() => setShowMask(!showMask)}
+              className={`p-1 rounded-md transition text-xs flex items-center gap-1 ${
+                showMask
+                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                  : 'text-graphite-500 hover:text-graphite-300'
+              }`}
+              title="Toggle SAM 3.1 Segmentation Mask"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span className="text-[10px] hidden sm:inline font-mono">Mask</span>
+            </button>
+            <button
+              onClick={() => setShowBoundingBox(!showBoundingBox)}
+              className={`p-1 rounded-md transition text-xs flex items-center gap-1 ${
+                showBoundingBox
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                  : 'text-graphite-500 hover:text-graphite-300'
+              }`}
+              title="Toggle Bounding Box"
+            >
+              <Target className="w-3.5 h-3.5" />
+              <span className="text-[10px] hidden sm:inline font-mono">Box</span>
+            </button>
+            <button
+              onClick={() => setShowTrail(!showTrail)}
+              className={`p-1 rounded-md transition text-xs flex items-center gap-1 ${
+                showTrail
+                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                  : 'text-graphite-500 hover:text-graphite-300'
+              }`}
+              title="Toggle Motion Trail"
+            >
+              <Sliders className="w-3.5 h-3.5" />
+              <span className="text-[10px] hidden sm:inline font-mono">Trail</span>
+            </button>
+          </div>
+
           <button
             onClick={onOpenCalibration}
-            className="px-2 py-0.5 rounded bg-graphite-800 hover:bg-graphite-750 text-graphite-300 hover:text-graphite-100 border border-graphite-700/80 text-[11px] font-mono transition flex items-center gap-1.5"
+            className="px-2 py-1 rounded-lg bg-graphite-850 hover:bg-graphite-800 text-graphite-300 hover:text-slate-100 border border-graphite-750 text-xs font-mono transition flex items-center gap-1.5"
             title="Configure pivot coordinate and physical scale"
           >
             <Crosshair className="w-3 h-3 text-blue-400" />
@@ -443,7 +496,7 @@ export const VideoInspectionPanel: React.FC<VideoInspectionPanelProps> = ({
       </div>
 
       {/* Main Viewport */}
-      <div className="relative flex-1 min-h-[320px] flex items-center justify-center bg-[#070910] p-2 overflow-hidden select-none">
+      <div className="relative flex-1 min-h-[300px] flex items-center justify-center bg-[#070910] p-2 overflow-hidden select-none">
         {videoUrl && !isSyntheticSample && (
           <video
             ref={videoRef}
@@ -458,105 +511,57 @@ export const VideoInspectionPanel: React.FC<VideoInspectionPanelProps> = ({
           ref={canvasRef}
           width={width}
           height={height}
-          className="max-h-full max-w-full aspect-[4/3] object-contain rounded border border-graphite-800/80"
+          className="max-h-full max-w-full aspect-[4/3] object-contain rounded-lg border border-graphite-800/80"
         />
+      </div>
 
-        {/* Telemetry HUD (Top-Left) */}
-        {currentMeasurement && (
-          <div className="absolute top-3 left-3 p-2 rounded bg-graphite-950/90 backdrop-blur-sm border border-graphite-800 font-mono text-[11px] space-y-1 shadow-sm pointer-events-none">
-            <div className="flex items-center justify-between gap-4 text-graphite-400 text-[10px]">
-              <span>TIMESTAMP</span>
+      {/* Frame Telemetry Status Ribbon */}
+      {currentMeasurement && (
+        <div className="px-3.5 py-1.5 bg-[#0b0e15] border-t border-graphite-800/60 flex items-center justify-between text-xs font-mono">
+          <div className="flex items-center gap-3">
+            <span className="text-graphite-400">
+              t:{' '}
               <span className="text-blue-300 font-semibold tabular-nums">
-                {currentMeasurement.timestamp.toFixed(3)} s
+                {currentMeasurement.timestamp.toFixed(3)}s
               </span>
-            </div>
-            <div className="flex items-center justify-between gap-4 text-graphite-400 text-[10px]">
-              <span>OBSERVED θ</span>
+            </span>
+            <span className="text-graphite-400">
+              θ_obs:{' '}
               <span className="text-emerald-400 font-semibold tabular-nums">
                 {currentMeasurement.angleDeg.toFixed(2)}°
               </span>
-            </div>
+            </span>
             {predictedAngleDeg !== undefined && (
-              <div className="flex items-center justify-between gap-4 text-graphite-400 text-[10px]">
-                <span>TWIN PREDICTED θ</span>
+              <span className="text-graphite-400">
+                θ_twin:{' '}
                 <span className="text-cyan-400 font-semibold tabular-nums">
                   {predictedAngleDeg.toFixed(2)}°
                 </span>
-              </div>
+              </span>
             )}
-            <div className="flex items-center justify-between gap-4 text-graphite-400 text-[10px]">
-              <span>BOB CENTROID</span>
-              <span className="text-graphite-300 tabular-nums">
-                ({Math.round(currentMeasurement.bobCentroid.x)},{' '}
-                {Math.round(currentMeasurement.bobCentroid.y)}) px
+            {predictedAngleDeg !== undefined && (
+              <span className="text-graphite-400 hidden sm:inline">
+                Δ:{' '}
+                <span className="text-amber-300 font-medium tabular-nums">
+                  {Math.abs(currentMeasurement.angleDeg - predictedAngleDeg).toFixed(2)}°
+                </span>
               </span>
-            </div>
-            <div className="flex items-center justify-between gap-4 text-graphite-400 text-[10px]">
-              <span>PIVOT REF</span>
-              <span className="text-graphite-300 tabular-nums">
-                ({calibration.pivot.x}, {calibration.pivot.y}) px
-              </span>
-            </div>
+            )}
           </div>
-        )}
-
-        {/* Layer Visibility Chips (Top-Right) */}
-        <div className="absolute top-3 right-3 flex flex-col gap-1 font-mono text-[10px]">
-          <button
-            onClick={() => setShowGhostTwin(!showGhostTwin)}
-            className={`px-2 py-0.5 rounded border transition flex items-center gap-1 ${
-              showGhostTwin
-                ? 'bg-cyan-950/70 border-cyan-500/50 text-cyan-300'
-                : 'bg-graphite-900/80 border-graphite-800 text-graphite-500'
-            }`}
-            title="Toggle Ghost Digital Twin overlay on video"
-          >
-            <Ghost className="w-2.5 h-2.5 text-cyan-400" />
-            <span>GHOST TWIN</span>
-          </button>
-          <button
-            onClick={() => setShowMask(!showMask)}
-            className={`px-2 py-0.5 rounded border transition flex items-center gap-1 ${
-              showMask
-                ? 'bg-purple-950/60 border-purple-500/40 text-purple-300'
-                : 'bg-graphite-900/80 border-graphite-800 text-graphite-500'
-            }`}
-          >
-            <Eye className="w-2.5 h-2.5" />
-            <span>MASK</span>
-          </button>
-          <button
-            onClick={() => setShowBoundingBox(!showBoundingBox)}
-            className={`px-2 py-0.5 rounded border transition flex items-center gap-1 ${
-              showBoundingBox
-                ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300'
-                : 'bg-graphite-900/80 border-graphite-800 text-graphite-500'
-            }`}
-          >
-            <Target className="w-2.5 h-2.5" />
-            <span>BOX</span>
-          </button>
-          <button
-            onClick={() => setShowTrail(!showTrail)}
-            className={`px-2 py-0.5 rounded border transition flex items-center gap-1 ${
-              showTrail
-                ? 'bg-blue-950/60 border-blue-500/40 text-blue-300'
-                : 'bg-graphite-900/80 border-graphite-800 text-graphite-500'
-            }`}
-          >
-            <Sliders className="w-2.5 h-2.5" />
-            <span>TRAIL</span>
-          </button>
+          <div className="text-graphite-500 text-[11px] tabular-nums hidden sm:block">
+            Centroid: ({Math.round(currentMeasurement.bobCentroid.x)},{' '}
+            {Math.round(currentMeasurement.bobCentroid.y)}) px
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Scrubbing & Transport Control Strip */}
-      <div className="px-3.5 py-2 bg-[#0f1219] border-t border-graphite-800/60 flex flex-col gap-1.5 select-none">
-        <div className="flex items-center justify-between font-mono text-xs text-graphite-400">
-          <div className="flex items-center gap-2">
+      <div className="px-3.5 py-2 bg-[#0c0e15] border-t border-graphite-800/60 flex flex-col gap-2 select-none">
+        <div className="flex items-center justify-between text-xs text-graphite-400">
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => setIsPlaying(!isPlaying)}
-              className="p-1 rounded bg-graphite-750 hover:bg-graphite-700 text-graphite-100 border border-graphite-700 transition"
+              className="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition cursor-pointer shadow-sm shadow-blue-900/30"
               title={isPlaying ? 'Pause playback' : 'Play trajectory'}
             >
               {isPlaying ? (
@@ -567,37 +572,32 @@ export const VideoInspectionPanel: React.FC<VideoInspectionPanelProps> = ({
             </button>
             <button
               onClick={() => onSeekFrame(Math.max(0, currentFrameIndex - 1))}
-              className="p-1 rounded bg-graphite-800 hover:bg-graphite-750 text-graphite-300 border border-graphite-750 transition"
+              className="p-1.5 rounded-lg bg-graphite-800 hover:bg-graphite-750 text-graphite-300 transition"
               title="Step backward 1 frame"
             >
-              <SkipBack className="w-3 h-3" />
+              <SkipBack className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() =>
                 onSeekFrame(Math.min(totalFrames - 1, currentFrameIndex + 1))
               }
-              className="p-1 rounded bg-graphite-800 hover:bg-graphite-750 text-graphite-300 border border-graphite-750 transition"
+              className="p-1.5 rounded-lg bg-graphite-800 hover:bg-graphite-750 text-graphite-300 transition"
               title="Step forward 1 frame"
             >
-              <SkipForward className="w-3 h-3" />
+              <SkipForward className="w-3.5 h-3.5" />
             </button>
 
-            <span className="text-graphite-300 text-[11px] ml-1 tabular-nums">
-              FRAME{' '}
-              <strong className="text-graphite-100 font-semibold">
+            <span className="text-slate-300 text-xs ml-2 font-mono tabular-nums">
+              Frame{' '}
+              <strong className="text-slate-100 font-semibold">
                 {String(currentFrameIndex + 1).padStart(3, '0')}
               </strong>{' '}
               / {String(Math.max(1, totalFrames)).padStart(3, '0')}
             </span>
           </div>
 
-          <div className="text-graphite-400 text-[11px] tabular-nums">
-            {fps} FPS |{' '}
-            {(
-              (totalFrames / fps) ||
-              0
-            ).toFixed(2)}
-            s
+          <div className="text-graphite-400 text-xs font-mono tabular-nums">
+            {fps} FPS • {((totalFrames / fps) || 0).toFixed(2)}s
           </div>
         </div>
 
@@ -612,7 +612,7 @@ export const VideoInspectionPanel: React.FC<VideoInspectionPanelProps> = ({
               setIsPlaying(false);
               onSeekFrame(Number(e.target.value));
             }}
-            className="w-full h-1 bg-graphite-800 rounded appearance-none cursor-pointer accent-blue-500 focus:outline-none"
+            className="w-full h-1.5 bg-graphite-800 rounded-lg appearance-none cursor-pointer accent-blue-500 focus:outline-none"
           />
         </div>
       </div>

@@ -70,3 +70,4 @@ describe('Extended Kalman Filter (EKF) State Observer', () => {
     expect(Math.abs(kState.xHat[2])).toBeLessThan(0.05);
   });
 });
+

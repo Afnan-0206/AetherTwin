@@ -632,29 +632,29 @@ export default function Home() {
             </p>
 
             {/* Benchmark Preset Selection Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 mb-6 text-left font-mono">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8 text-left">
               {BENCHMARK_PRESETS.map((p) => {
                 const isSelected = activePresetId === p.id;
                 return (
                   <div
                     key={p.id}
                     onClick={() => setActivePresetId(p.id)}
-                    className={`p-3 rounded-lg border cursor-pointer transition flex flex-col justify-between ${
+                    className={`p-3.5 rounded-xl border cursor-pointer transition flex flex-col justify-between ${
                       isSelected
-                        ? 'bg-blue-950/30 border-blue-500/50 text-blue-100 ring-1 ring-blue-500/30'
-                        : 'bg-graphite-900/60 border-graphite-800/80 text-graphite-300 hover:bg-graphite-850'
+                        ? 'bg-blue-950/30 border-blue-500/50 text-blue-100 ring-1 ring-blue-500/30 shadow-md shadow-blue-900/10'
+                        : 'bg-graphite-900/60 border-graphite-800/80 text-graphite-300 hover:bg-graphite-850 hover:border-graphite-750'
                     }`}
                   >
                     <div>
-                      <div className="text-[11px] font-semibold text-slate-200 mb-1 flex items-center justify-between">
+                      <div className="text-xs font-semibold text-slate-100 mb-1 flex items-center justify-between">
                         <span>{p.name}</span>
-                        {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />}
+                        {isSelected && <span className="w-2 h-2 rounded-full bg-blue-400" />}
                       </div>
-                      <div className="text-[10px] text-graphite-400 leading-snug mb-2">
+                      <div className="text-[11px] text-graphite-400 leading-snug mb-3">
                         {p.tagline}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5 text-[9px] text-graphite-500 pt-2 border-t border-graphite-800/60">
+                    <div className="flex items-center gap-2 text-[10px] font-mono text-graphite-500 pt-2.5 border-t border-graphite-800/60 tabular-nums">
                       <span>θ₀: {p.initialAngleDeg}°</span>
                       <span>•</span>
                       <span>L: {p.lengthMeters}m</span>
@@ -670,16 +670,16 @@ export default function Home() {
             <div className="flex flex-wrap items-center justify-center gap-3">
               <button
                 onClick={() => handleRunSampleAnalysis(activePresetId)}
-                className="focus-ring px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-mono font-medium text-sm transition-all flex items-center gap-2.5 shadow-lg shadow-blue-900/20"
+                className="focus-ring px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-medium text-sm transition-all flex items-center gap-2.5 shadow-lg shadow-blue-900/25"
               >
                 <Play className="w-4 h-4 fill-current" />
                 <span>Run Selected Benchmark</span>
-                <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+                <ChevronRight className="w-3.5 h-3.5 opacity-60" />
               </button>
 
               <button
                 onClick={() => setIsUploadOpen(true)}
-                className="focus-ring px-4 py-2.5 rounded-lg bg-graphite-900/80 hover:bg-graphite-850 text-graphite-200 border border-graphite-800/60 font-mono text-sm transition-all flex items-center gap-2"
+                className="focus-ring px-4 py-2.5 rounded-xl bg-graphite-900 hover:bg-graphite-850 text-slate-200 border border-graphite-800 font-medium text-sm transition-all flex items-center gap-2"
               >
                 <Upload className="w-4 h-4 text-graphite-400" />
                 <span>Upload Custom Clip</span>
@@ -687,7 +687,7 @@ export default function Home() {
 
               <button
                 onClick={() => setIsTourOpen(true)}
-                className="focus-ring px-4 py-2.5 rounded-lg bg-blue-950/40 hover:bg-blue-900/40 text-blue-300 border border-blue-500/30 font-mono text-sm transition-all flex items-center gap-2"
+                className="focus-ring px-4 py-2.5 rounded-xl bg-blue-950/40 hover:bg-blue-900/40 text-blue-300 border border-blue-500/30 font-medium text-sm transition-all flex items-center gap-2"
               >
                 <Sparkles className="w-4 h-4 text-blue-400" />
                 <span>Guided Tour</span>
@@ -695,7 +695,7 @@ export default function Home() {
 
               <button
                 onClick={() => setIsMetaStackOpen(true)}
-                className="focus-ring px-3.5 py-2.5 rounded-lg bg-purple-950/40 hover:bg-purple-900/40 text-purple-300 border border-purple-500/30 font-mono text-sm transition-all flex items-center gap-1.5"
+                className="focus-ring px-3.5 py-2.5 rounded-xl bg-purple-950/40 hover:bg-purple-900/40 text-purple-300 border border-purple-500/30 font-medium text-sm transition-all flex items-center gap-1.5"
                 title="Inspect Meta SAM 3.1 & Llama 3.3 Architecture"
               >
                 <Brain className="w-4 h-4 text-purple-400" />
@@ -704,7 +704,7 @@ export default function Home() {
 
               <button
                 onClick={() => setIsFirmwareOpen(true)}
-                className="focus-ring px-3.5 py-2.5 rounded-lg bg-emerald-950/40 hover:bg-emerald-900/40 text-emerald-300 border border-emerald-500/30 font-mono text-sm transition-all flex items-center gap-1.5"
+                className="focus-ring px-3.5 py-2.5 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/40 text-emerald-300 border border-emerald-500/30 font-medium text-sm transition-all flex items-center gap-1.5"
                 title="Open 100Hz Edge Microcontroller Firmware Emulator"
               >
                 <Cpu className="w-4 h-4 text-emerald-400" />
@@ -713,20 +713,20 @@ export default function Home() {
             </div>
 
             {/* Quick Switch to Bento */}
-            <div className="mt-4 flex items-center justify-center gap-1.5 text-xs font-mono text-graphite-500">
+            <div className="mt-5 flex items-center justify-center gap-1.5 text-xs text-graphite-400">
               <span>Looking for high-density physical telemetry?</span>
               <button
                 type="button"
                 onClick={() => setActiveView('bento')}
-                className="text-blue-400 hover:text-blue-300 underline underline-offset-4 flex items-center gap-0.5"
+                className="text-blue-400 hover:text-blue-300 underline underline-offset-4 flex items-center gap-0.5 font-medium"
               >
                 <span>Switch to Bento Telemetry Matrix</span>
-                <ChevronRight className="w-3 h-3" />
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
             {/* Subtext */}
-            <p className="text-[10px] font-mono text-graphite-600 mt-6">
+            <p className="text-xs text-graphite-500 mt-6">
               Meta SAM 3.1 & In-Browser Optical Flow • Muse Spark 1.3 • Deterministic RK4 • Circle-Fit Pivot Calibration
             </p>
           </div>
