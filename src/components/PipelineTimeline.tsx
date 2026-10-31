@@ -13,7 +13,6 @@ interface StepConfig {
   id: PipelineStage;
   num: number;
   label: string;
-  sublabel: string;
   icon: React.ComponentType<{ className?: string }>;
 }
 
@@ -22,42 +21,36 @@ const STEPS: StepConfig[] = [
     id: 'video_loaded',
     num: 1,
     label: 'Media Ingest',
-    sublabel: 'Video & Calibration',
     icon: Video
   },
   {
     id: 'segmenting',
     num: 2,
     label: 'SAM 3.1 Tracking',
-    sublabel: 'Mask Stream',
     icon: Target
   },
   {
     id: 'measuring',
     num: 3,
-    label: 'Angle Extraction',
-    sublabel: 'Kinematic θ(t)',
+    label: 'Kinematic θ(t)',
     icon: Compass
   },
   {
     id: 'fitting',
     num: 4,
-    label: 'RK4 Fitting (70%)',
-    sublabel: 'Parameter Ident.',
+    label: 'RK4 Fit (70%)',
     icon: Sliders
   },
   {
     id: 'validating',
     num: 5,
     label: 'Holdout Test (30%)',
-    sublabel: 'Predictive Check',
     icon: ShieldCheck
   },
   {
     id: 'diagnosing',
     num: 6,
     label: 'Meta AI Reasoning',
-    sublabel: 'Physical Copilot',
     icon: Sparkles
   }
 ];
@@ -81,9 +74,10 @@ export const PipelineTimeline: React.FC<PipelineTimelineProps> = ({ stage, error
   if (stage === 'idle') return null;
 
   return (
-    <div className="w-full bg-[#0c0e15] border-b border-graphite-800/60 px-4 lg:px-6 py-2 select-none">
-      <div className="max-w-[1760px] mx-auto flex items-center justify-between gap-2 overflow-x-auto scrollbar-none">
-        <div className="flex items-center gap-1.5 flex-1 min-w-[700px]">
+    <div className="w-full bg-[#0c0e15] border-b border-graphite-800/60 px-3 sm:px-4 lg:px-6 py-1.5 select-none overflow-x-auto scrollbar-none">
+      <div className="max-w-[1760px] mx-auto flex items-center justify-between gap-3 min-w-max">
+        {/* Connected Step Chain */}
+        <div className="flex items-center gap-1.5">
           {STEPS.map((step, idx) => {
             const stepLevel = idx + 1;
             const isDone = currentLevel > stepLevel || stage === 'completed';
@@ -93,7 +87,7 @@ export const PipelineTimeline: React.FC<PipelineTimelineProps> = ({ stage, error
             return (
               <React.Fragment key={step.id}>
                 <div
-                  className={`flex items-center gap-2 px-2.5 py-1 rounded-lg transition-all duration-200 shrink-0 ${
+                  className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md transition-all duration-200 shrink-0 ${
                     isActive
                       ? 'bg-blue-500/10 border border-blue-500/30 text-blue-200'
                       : isDone
@@ -103,7 +97,7 @@ export const PipelineTimeline: React.FC<PipelineTimelineProps> = ({ stage, error
                 >
                   {/* Step status pip */}
                   <div
-                    className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 text-[10px] font-mono font-semibold ${
+                    className={`w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0 text-[9px] font-mono font-semibold ${
                       isFailed
                         ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
                         : isActive
@@ -125,45 +119,40 @@ export const PipelineTimeline: React.FC<PipelineTimelineProps> = ({ stage, error
                   </div>
 
                   {/* Step label */}
-                  <div className="flex items-baseline gap-1.5 leading-none">
-                    <span
-                      className={`text-xs font-medium ${
-                        isActive
-                          ? 'text-blue-200'
-                          : isDone
-                          ? 'text-slate-200'
-                          : 'text-graphite-400'
-                      }`}
-                    >
-                      {step.label}
-                    </span>
-                    <span className="text-[10px] text-graphite-500 hidden xl:inline">
-                      {step.sublabel}
-                    </span>
-                  </div>
+                  <span
+                    className={`text-xs font-medium whitespace-nowrap ${
+                      isActive
+                        ? 'text-blue-200 font-semibold'
+                        : isDone
+                        ? 'text-slate-200'
+                        : 'text-graphite-400'
+                    }`}
+                  >
+                    {step.label}
+                  </span>
                 </div>
 
                 {/* Connector line */}
                 {idx < STEPS.length - 1 && (
-                  <div className="flex-1 h-px bg-graphite-800/80 min-w-[12px] max-w-[40px]" />
+                  <div className="w-4 h-px bg-graphite-800/80 shrink-0" />
                 )}
               </React.Fragment>
             );
           })}
         </div>
 
-        {/* Global Pipeline Status Badge */}
+        {/* Global Pipeline Status / Error Badge (Safely Separated, No Overlap) */}
         {stage === 'completed' && (
-          <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-medium shrink-0">
+          <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-medium shrink-0 ml-4">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
             <span>Strict 70/30 Separation Validated</span>
           </div>
         )}
 
         {stage === 'error' && error && (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium shrink-0">
+          <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium shrink-0 ml-4">
             <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-            <span className="truncate max-w-xs">{error}</span>
+            <span className="truncate max-w-sm">{error}</span>
           </div>
         )}
       </div>
