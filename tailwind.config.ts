@@ -1,6 +1,7 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  darkMode: ["class"],
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -9,8 +10,39 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "#0a0c10",
-        foreground: "#f3f4f6",
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
         graphite: {
           950: "#0b0d13",
           900: "#11141d",
@@ -23,7 +55,7 @@ const config: Config = {
           400: "#94a3b8",
           300: "#cbd5e1",
           200: "#e2e8f0",
-          100: "#f1f5f9"
+          100: "#f1f5f9",
         },
         panel: {
           bg: "#0d0f16",
@@ -32,26 +64,50 @@ const config: Config = {
           border: "#1f2434",
           borderSubtle: "#171b26",
           divider: "#1f2434",
-          hover: "#1e2333"
+          hover: "#1e2333",
         },
         status: {
-          observed: "#3b82f6",     // Precision Blue
+          observed: "#3b82f6", // Precision Blue
           observedBg: "#0f172a",
-          calculated: "#10b981",   // Scientific Emerald
+          calculated: "#10b981", // Scientific Emerald
           calculatedBg: "#06281e",
-          model: "#f59e0b",        // Theoretical Ochre
+          model: "#f59e0b", // Theoretical Ochre
           modelBg: "#291b05",
-          deviation: "#f43f5e",    // Residual Rose
-          deviationBg: "#2b0a13"
-        }
+          deviation: "#f43f5e", // Residual Rose
+          deviationBg: "#2b0a13",
+        },
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', 'monospace'],
-        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+        mono: [
+          "JetBrains Mono",
+          "ui-monospace",
+          "SFMono-Regular",
+          "Menlo",
+          "Monaco",
+          "Consolas",
+          "Liberation Mono",
+          "Courier New",
+          "monospace",
+        ],
+        sans: [
+          "Inter",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "Segoe UI",
+          "Roboto",
+          "Helvetica Neue",
+          "Arial",
+          "sans-serif",
+        ],
       },
       fontSize: {
-        '2xs': ['0.6875rem', { lineHeight: '0.875rem' }],
-      }
+        "2xs": ["0.6875rem", { lineHeight: "0.875rem" }],
+      },
     },
   },
   plugins: [],

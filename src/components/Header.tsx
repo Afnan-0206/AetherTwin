@@ -1,9 +1,11 @@
 'use client';
 
 import React from 'react';
-import { Play, Upload, RotateCcw, HelpCircle, Ruler, Activity, Layers, Volume2, VolumeX } from 'lucide-react';
+import { Play, Upload, RotateCcw, HelpCircle, Ruler, Activity, Layers, Volume2, VolumeX, LayoutDashboard, Grid3X3 } from 'lucide-react';
 import { BenchmarkPresetId } from '@/lib/types';
 import { BENCHMARK_PRESETS } from '@/lib/sample/syntheticPendulum';
+
+export type AppViewMode = 'workbench' | 'bento' | 'demo';
 
 interface HeaderProps {
   onRunSample: (presetId?: BenchmarkPresetId) => void;
@@ -19,6 +21,8 @@ interface HeaderProps {
   onSelectPreset?: (presetId: BenchmarkPresetId) => void;
   isAudioActive?: boolean;
   onToggleAudio?: () => void;
+  currentView?: AppViewMode;
+  onChangeView?: (view: AppViewMode) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -34,12 +38,14 @@ export const Header: React.FC<HeaderProps> = ({
   activePresetId = 'standard',
   onSelectPreset,
   isAudioActive = false,
-  onToggleAudio
+  onToggleAudio,
+  currentView = 'workbench',
+  onChangeView
 }) => {
   return (
     <header className="border-b border-graphite-800/80 bg-[#0a0d14] sticky top-0 z-40 select-none">
       <div className="max-w-[1720px] mx-auto px-4 lg:px-6 h-12 flex items-center justify-between gap-3">
-        {/* Left: Branding */}
+        {/* Left: Branding & Mode */}
         <div className="flex items-center gap-3 shrink-0">
           <div className="flex items-center gap-2.5">
             {/* Logo mark */}
@@ -86,6 +92,54 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
         </div>
+
+        {/* Center: View Switcher (Workbench / Telemetry Bento / UI Demo) */}
+        {onChangeView && (
+          <div className="flex items-center p-0.5 rounded-lg bg-graphite-900/90 border border-graphite-800/80 text-[11px] font-mono shadow-inner">
+            <button
+              type="button"
+              onClick={() => onChangeView('workbench')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all ${
+                currentView === 'workbench'
+                  ? 'bg-blue-600 text-white font-medium shadow-sm'
+                  : 'text-graphite-400 hover:text-slate-200 hover:bg-graphite-850/50'
+              }`}
+              title="Standard 3-region mechanical inspection & simulation workbench"
+            >
+              <LayoutDashboard className="w-3.5 h-3.5" />
+              <span>Workbench</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onChangeView('bento')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all ${
+                currentView === 'bento'
+                  ? 'bg-blue-600 text-white font-medium shadow-sm'
+                  : 'text-graphite-400 hover:text-slate-200 hover:bg-graphite-850/50'
+              }`}
+              title="Modern Bento Telemetry dashboard with LQR control, holdout respiration & energy treemap"
+            >
+              <Activity className="w-3.5 h-3.5" />
+              <span>Bento Telemetry</span>
+              {hasData && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => onChangeView('demo')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all ${
+                currentView === 'demo'
+                  ? 'bg-blue-600 text-white font-medium shadow-sm'
+                  : 'text-graphite-400 hover:text-slate-200 hover:bg-graphite-850/50'
+              }`}
+              title="Showcase raw Bento UI component demo"
+            >
+              <Grid3X3 className="w-3.5 h-3.5" />
+              <span className="hidden xl:inline">Bento Demo</span>
+            </button>
+          </div>
+        )}
 
         {/* Right: Toolbar & Benchmark Selector */}
         <div className="flex items-center gap-1.5">

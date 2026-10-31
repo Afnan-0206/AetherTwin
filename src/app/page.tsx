@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Header } from '@/components/Header';
+import { Header, AppViewMode } from '@/components/Header';
 import { PipelineTimeline } from '@/components/PipelineTimeline';
 import { VideoInspectionPanel } from '@/components/VideoInspectionPanel';
 import { InteractiveTwinPanel } from '@/components/InteractiveTwinPanel';
@@ -9,6 +9,8 @@ import { MetricsDiagnosticsPanel } from '@/components/MetricsDiagnosticsPanel';
 import { CalibrationModal } from '@/components/CalibrationModal';
 import { UploadModal } from '@/components/UploadModal';
 import { HelpModal } from '@/components/HelpModal';
+import { PhysicsTelemetryBento } from '@/components/ui/physics-telemetry-bento';
+import AnalyticsBentoDemo from '@/components/ui/demo';
 import {
   FrameMeasurement,
   CalibrationConfig,
@@ -48,6 +50,7 @@ export default function Home() {
   const [isLiveDiagnostic, setIsLiveDiagnostic] = useState<boolean>(false);
   const [provenanceLog, setProvenanceLog] = useState<ProvenanceLogEntry[]>([]);
   const [activePresetId, setActivePresetId] = useState<BenchmarkPresetId>('standard');
+  const [activeView, setActiveView] = useState<AppViewMode>('workbench');
   const [isAudioActive, setIsAudioActive] = useState<boolean>(false);
 
   // Source media state
@@ -483,13 +486,71 @@ export default function Home() {
         onSelectPreset={setActivePresetId}
         isAudioActive={isAudioActive}
         onToggleAudio={handleToggleAudio}
+        currentView={activeView}
+        onChangeView={setActiveView}
       />
 
-      {/* Analysis Stage Pipeline Tracker */}
-      <PipelineTimeline stage={stage} error={error} />
+      {/* Analysis Stage Pipeline Tracker (shown in workbench or bento view) */}
+      {activeView !== 'demo' && <PipelineTimeline stage={stage} error={error} />}
 
-      {/* Idle Welcome State */}
-      {stage === 'idle' && (
+      {/* VIEW 1: Showcase Bento UI Demo */}
+      {activeView === 'demo' && (
+        <section className="flex-1 w-full bg-background panel-enter">
+          <AnalyticsBentoDemo />
+        </section>
+      )}
+
+      {/* VIEW 2: High-Density Physics Telemetry Bento */}
+      {activeView === 'bento' && (
+        <main className="flex-1 max-w-[1720px] w-full mx-auto p-4 lg:p-6 panel-enter space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-xl bg-graphite-900/60 border border-graphite-800">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono font-semibold uppercase tracking-wider text-blue-400">
+                  Physics Telemetry Matrix
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                  Bento Layout
+                </span>
+              </div>
+              <p className="text-xs text-graphite-400 mt-1 font-mono">
+                Real-time SVG Catmull-Rom dynamics • Hamiltonian energy dissipation treemap • 70/30 holdout verification • CARE LQR control effort
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => handleRunSampleAnalysis(activePresetId)}
+                disabled={['segmenting', 'measuring', 'fitting', 'validating', 'diagnosing'].includes(stage)}
+                className="focus-ring px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-medium flex items-center gap-1.5 shadow-md shadow-blue-900/30 transition-all"
+              >
+                <Play className="w-3.5 h-3.5 fill-current" />
+                <span>Simulate Benchmark</span>
+              </button>
+              <button
+                onClick={() => setActiveView('workbench')}
+                className="focus-ring px-3 py-1.5 rounded-lg bg-graphite-800 hover:bg-graphite-750 text-graphite-200 font-mono text-xs flex items-center gap-1.5 border border-graphite-700/60 transition-all"
+              >
+                <span>3D Motion Workbench →</span>
+              </button>
+            </div>
+          </div>
+
+          <PhysicsTelemetryBento
+            metrics={metrics}
+            parameters={fittedParameters}
+            comparisonPoints={comparisonPoints}
+            activePresetId={activePresetId}
+            onSelectPreset={(pid) => {
+              setActivePresetId(pid);
+              handleRunSampleAnalysis(pid);
+            }}
+          />
+        </main>
+      )}
+
+      {/* VIEW 3: Standard Motion Digital Twin Workbench */}
+      {activeView === 'workbench' && stage === 'idle' && (
         <section className="flex-1 flex items-center justify-center px-4 lg:px-6 py-10">
           <div className="max-w-3xl w-full text-center panel-enter">
             {/* Logo */}
@@ -559,6 +620,19 @@ export default function Home() {
               </button>
             </div>
 
+            {/* Quick Switch to Bento */}
+            <div className="mt-4 flex items-center justify-center gap-1.5 text-xs font-mono text-graphite-500">
+              <span>Looking for high-density physical telemetry?</span>
+              <button
+                type="button"
+                onClick={() => setActiveView('bento')}
+                className="text-blue-400 hover:text-blue-300 underline underline-offset-4 flex items-center gap-0.5"
+              >
+                <span>Switch to Bento Telemetry Matrix</span>
+                <ChevronRight className="w-3 h-3" />
+              </button>
+            </div>
+
             {/* Subtext */}
             <p className="text-[10px] font-mono text-graphite-600 mt-6">
               Meta SAM 3.1 & In-Browser Optical Flow • Muse Spark 1.3 • Deterministic RK4 • Circle-Fit Pivot Calibration
@@ -568,7 +642,7 @@ export default function Home() {
       )}
 
       {/* Main 3-Region Desktop Workbench Grid */}
-      {stage !== 'idle' && (
+      {activeView === 'workbench' && stage !== 'idle' && (
         <main className="flex-1 max-w-[1720px] w-full mx-auto p-4 lg:p-5 panel-enter">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
             {/* Region A: Video & Segmentation Overlay */}
