@@ -179,3 +179,4 @@ The project is not a conceptual mockup; it is a fully functioning, tested, and p
 - **Project URL:** [https://github.com/Afnan-0206/AetherTwin](https://github.com/Afnan-0206/AetherTwin)
 - **License:** MIT License (Open Source)
 - **Primary Technologies:** Next.js 14 (App Router), TypeScript, Tailwind CSS, Web Audio API, Vitest, Meta SAM 3.1, Meta Muse Spark, ROS 2 Humble, Arduino C++, MATLAB/Simulink.
+
