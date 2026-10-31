@@ -3,6 +3,7 @@ import {
   generateMuseSparkDiagnosis,
   validateMuseSparkOutput,
   generateLocalRuleBasedDiagnostic,
+  answerCopilotPhysicalQuery,
   MuseSparkDiagnosisInput
 } from '../lib/meta/museSparkClient';
 
@@ -129,5 +130,59 @@ describe('Muse Spark 1.3 Client & Output Validation', () => {
     } finally {
       global.fetch = originalFetch;
     }
+  });
+
+  describe('Interactive Physical Copilot Q&A', () => {
+    const mockContext = {
+      parameters: baseInput.parameters,
+      metrics: baseInput.metrics,
+      lqrModel: {
+        K: [-10.0, -16.0, -70.32, -18.41],
+        isStable: true
+      },
+      spectral: {
+        fundamentalFrequencyHz: 0.707,
+        harmonicRatio: 0.034,
+        dominantHarmonicHz: 2.12
+      },
+      chaosHorizon: {
+        lyapunovHorizonSeconds: 1.45,
+        isChaotic: true
+      }
+    };
+
+    it('answers LQR control & wind turbulence rejection queries with gains', () => {
+      const ans = answerCopilotPhysicalQuery('Evaluate LQR control authority under high winds', mockContext);
+      expect(ans).toContain('[LQR Control & Disturbance Rejection Analysis]');
+      expect(ans).toContain('-70.32');
+      expect(ans).toContain('Hurwitz Stability');
+    });
+
+    it('answers damping and energy dissipation queries', () => {
+      const ans = answerCopilotPhysicalQuery('Explain damping and Stokes dissipation rate', mockContext);
+      expect(ans).toContain('[Dissipation Dynamics & Damping Regime Analysis]');
+      expect(ans).toContain('Underdamped');
+      expect(ans).toContain('monotonically non-increasing');
+    });
+
+    it('answers Fourier harmonics and THD non-linearity queries', () => {
+      const ans = answerCopilotPhysicalQuery('What causes the 3rd harmonic spectral distortion?', mockContext);
+      expect(ans).toContain('[Fourier Spectral & Harmonic Distortion Analysis]');
+      expect(ans).toContain('0.707 Hz');
+      expect(ans).toContain('Duffing');
+    });
+
+    it('explains Taipei 101 TMD structural damper physics', () => {
+      const ans = answerCopilotPhysicalQuery('How does the Taipei 101 TMD damper absorb wind vibrations?', mockContext);
+      expect(ans).toContain('[Taipei 101 Tuned Mass Damper (TMD) Mechanics]');
+      expect(ans).toContain('660-tonne');
+    });
+
+    it('explains holdout generalization vs overfitting', () => {
+      const ans = answerCopilotPhysicalQuery('Is the model overfitting on the 70/30 holdout split?', mockContext);
+      expect(ans).toContain('[Generalization Rigor & Holdout Validation Analysis]');
+      expect(ans).toContain('RMSE');
+      expect(ans).toContain('ODE invariants');
+    });
   });
 });

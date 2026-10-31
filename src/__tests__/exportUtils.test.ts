@@ -2,8 +2,12 @@ import { describe, it, expect } from 'vitest';
 import {
   generateTelemetryCSV,
   generatePythonReproductionScript,
-  generateVerificationCertificateMarkdown
+  generateVerificationCertificateMarkdown,
+  generateRos2NodeScript,
+  generateArduinoCppFirmware,
+  generateMatlabSimulinkScript
 } from '../lib/export/exportUtils';
+import { linearizeCartPole, DEFAULT_CARTPOLE_PARAMS } from '../lib/physics/cartPoleLqr';
 import { TrajectoryComparisonPoint, PendulumParameters, ValidationMetrics, ProvenanceLogEntry } from '../lib/types';
 
 describe('Export & Verification Utilities', () => {
@@ -102,6 +106,31 @@ describe('Export & Verification Utilities', () => {
     expect(cert).toContain('97.4%');
     expect(cert).toContain('Video Ingest');
     expect(cert).toContain('RK4 Fitting');
+  });
+
+  it('generates production-ready ROS 2 Humble Python control node with LQR gains', () => {
+    const lqrModel = linearizeCartPole(DEFAULT_CARTPOLE_PARAMS);
+    const ros2 = generateRos2NodeScript(mockParams, lqrModel);
+    expect(ros2).toContain('rclpy');
+    expect(ros2).toContain('AetherTwinLqrNode');
+    expect(ros2).toContain('/cmd_force');
+    expect(ros2).toContain('/joint_states');
+  });
+
+  it('generates embedded Arduino / C++ firmware for microcontroller deployment', () => {
+    const lqrModel = linearizeCartPole(DEFAULT_CARTPOLE_PARAMS);
+    const ino = generateArduinoCppFirmware(mockParams, lqrModel);
+    expect(ino).toContain('#include <Arduino.h>');
+    expect(ino).toContain('TARGET_POSITION');
+    expect(ino).toContain('analogWrite');
+  });
+
+  it('generates MATLAB / Simulink state-space LQR script', () => {
+    const lqrModel = linearizeCartPole(DEFAULT_CARTPOLE_PARAMS);
+    const m = generateMatlabSimulinkScript(mockParams, lqrModel);
+    expect(m).toContain('sys_ol = ss(A, B, C, D)');
+    expect(m).toContain('lqr(A, B, Q, R)');
+    expect(m).toContain('sys_cl = ss(A - B*K, B, C, D)');
   });
 });
 

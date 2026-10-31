@@ -1,10 +1,17 @@
 'use client';
 
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { PendulumParameters, SimulationState } from '@/lib/types';
 import { rk4Step } from '@/lib/physics/rk4';
 import { calculateEnergy, radToDeg, degToRad } from '@/lib/physics/dampedPendulum';
 import { rk4StepDoublePendulum, calculateDoublePendulumEnergy } from '@/lib/physics/doublePendulum';
+import {
+  CartPoleState,
+  DEFAULT_CARTPOLE_PARAMS,
+  linearizeCartPole,
+  rk4StepCartPole,
+  computeLqrControlForce
+} from '@/lib/physics/cartPoleLqr';
 import { physicsAudio } from '@/lib/audio/physicsAudio';
 import {
   RotateCcw,
@@ -14,7 +21,10 @@ import {
   Globe,
   Gauge,
   Flame,
-  Shuffle
+  Shuffle,
+  Navigation,
+  Wind,
+  Target
 } from 'lucide-react';
 import { ProvenanceBadge } from './ProvenanceBadge';
 
@@ -38,8 +48,19 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Mechanism Mode: 1-DOF Planar vs 2-DOF Chaotic Double Pendulum
-  const [mechanism, setMechanism] = useState<'single' | 'double'>('single');
+  // Mechanism Mode: 1-DOF Planar vs 2-DOF Chaotic Double vs 2-DOF Inverted Cart-Pole / TVC
+  const [mechanism, setMechanism] = useState<'single' | 'double' | 'lqr'>('single');
+
+  // LQR Cart-Pole / Rocket Landing TVC state
+  const [cartPoleState, setCartPoleState] = useState<CartPoleState>({
+    x: 0.0,
+    v: 0.0,
+    theta: 0.06, // small initial tilt ~3.4 deg
+    omega: 0.0,
+    u: 0.0
+  });
+  const [lqrTargetX, setLqrTargetX] = useState<number>(0.0);
+  const [lqrWindImpulse, setLqrWindImpulse] = useState<number>(0.0);
 
   // Single Pendulum Parameters
   const defaultGravity = fittedParameters?.gravity ?? 9.81;
@@ -51,6 +72,15 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
   const [lengthMeters, setLengthMeters] = useState<number>(defaultLength);
   const [damping, setDamping] = useState<number>(defaultDamping);
   const [initialAngleDeg, setInitialAngleDeg] = useState<number>(defaultTheta0);
+
+  // Compute analytical LQR model and optimal feedback gains
+  const lqrModel = useMemo(() => {
+    return linearizeCartPole({
+      ...DEFAULT_CARTPOLE_PARAMS,
+      poleLength: lengthMeters,
+      gravity: gravity
+    });
+  }, [lengthMeters, gravity]);
 
   // Live simulation state for single twin
   const [simState, setSimState] = useState<{
@@ -210,7 +240,7 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
             total: energy.total
           };
         });
-      } else {
+      } else if (mechanism === 'double') {
         // Double pendulum simulation loop
         setDoubleState((prev) => {
           const dParams = {
@@ -282,6 +312,37 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
             trail: nextTrail
           };
         });
+      } else if (mechanism === 'lqr') {
+        setCartPoleState((prev) => {
+          let st = { ...prev };
+          const dt = 1 / 60;
+          const subSteps = 4;
+          const subDt = dt / subSteps;
+          const cpParams = {
+            ...DEFAULT_CARTPOLE_PARAMS,
+            poleLength: lengthMeters,
+            gravity: gravity
+          };
+
+          for (let s = 0; s < subSteps; s++) {
+            const u =
+              computeLqrControlForce(st, lqrModel.K, lqrTargetX, DEFAULT_CARTPOLE_PARAMS.maxForce) +
+              lqrWindImpulse;
+            st = rk4StepCartPole(st, u, subDt, cpParams);
+          }
+
+          if (Math.abs(lqrWindImpulse) > 0.05) {
+            setLqrWindImpulse((w) => w * 0.88);
+          }
+
+          physicsAudio.updatePhysicsAudio(
+            st.omega,
+            st.theta,
+            Math.min(1.0, Math.abs(st.u) / DEFAULT_CARTPOLE_PARAMS.maxForce)
+          );
+
+          return st;
+        });
       }
 
       animationFrameId = requestAnimationFrame(loop);
@@ -292,7 +353,18 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
       cancelAnimationFrame(animationFrameId);
       physicsAudio.mute();
     };
-  }, [isSyncedWithVideo, isSimRunning, gravity, lengthMeters, damping, mechanism, fittedParameters]);
+  }, [
+    isSyncedWithVideo,
+    isSimRunning,
+    gravity,
+    lengthMeters,
+    damping,
+    mechanism,
+    fittedParameters,
+    lqrModel,
+    lqrTargetX,
+    lqrWindImpulse
+  ]);
 
   // Determine current display angle for single pendulum
   const activeTheta = isSyncedWithVideo
@@ -405,7 +477,7 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
       ctx.strokeStyle = '#38bdf8';
       ctx.lineWidth = 2;
       ctx.stroke();
-    } else {
+    } else if (mechanism === 'double') {
       // DOUBLE PENDULUM RENDERING
       const arm1Px = DOUBLE_PENDULUM_ARM1_PX;
       const arm2Px = DOUBLE_PENDULUM_ARM2_PX;
@@ -495,8 +567,165 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
       ctx.strokeStyle = '#38bdf8';
       ctx.lineWidth = 2;
       ctx.stroke();
+    } else if (mechanism === 'lqr') {
+      // ROCKET LANDING / CART-POLE LQR RENDERING
+      const railY = 225;
+      const trackLeft = 40;
+      const trackRight = width - 40;
+      const pxPerMeter = 140;
+
+      // 1. Ground Track Rail
+      ctx.beginPath();
+      ctx.moveTo(trackLeft, railY);
+      ctx.lineTo(trackRight, railY);
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Rail Distance Ticks (-1.5m to +1.5m)
+      for (let m = -1.5; m <= 1.5; m += 0.5) {
+        const tx = width / 2 + m * pxPerMeter;
+        if (tx >= trackLeft && tx <= trackRight) {
+          ctx.beginPath();
+          ctx.moveTo(tx, railY - 4);
+          ctx.lineTo(tx, railY + 6);
+          ctx.strokeStyle = m === 0 ? '#38bdf8' : '#475569';
+          ctx.lineWidth = m === 0 ? 2 : 1;
+          ctx.stroke();
+
+          ctx.fillStyle = m === 0 ? '#38bdf8' : '#64748b';
+          ctx.font = '8px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(`${m > 0 ? '+' : ''}${m}m`, tx, railY + 16);
+        }
+      }
+
+      // 2. Target Position Diamond Marker
+      const targetPx = width / 2 + lqrTargetX * pxPerMeter;
+      ctx.beginPath();
+      ctx.moveTo(targetPx, railY - 10);
+      ctx.lineTo(targetPx + 6, railY - 4);
+      ctx.lineTo(targetPx, railY + 2);
+      ctx.lineTo(targetPx - 6, railY - 4);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.35)';
+      ctx.fill();
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // 3. Cart / Landing Platform Chassis
+      const cartX = Math.max(trackLeft + 32, Math.min(trackRight - 32, width / 2 + cartPoleState.x * pxPerMeter));
+      const cartY = railY - 14;
+      const cartW = 64;
+      const cartH = 22;
+
+      // Chassis body
+      ctx.fillStyle = '#1e293b';
+      ctx.strokeStyle = '#0284c7';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(cartX - cartW / 2, cartY - cartH / 2, cartW, cartH, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      // Wheels
+      const wheelR = 6;
+      ctx.fillStyle = '#0f172a';
+      ctx.strokeStyle = '#64748b';
+      ctx.lineWidth = 1.5;
+      [-18, 18].forEach((offset) => {
+        ctx.beginPath();
+        ctx.arc(cartX + offset, railY - wheelR, wheelR, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+      });
+
+      // 4. Inverted Pole / Rocket Booster Body
+      const poleArmPx = Math.max(90, Math.min(180, lengthMeters * 120));
+      const polePivotX = cartX;
+      const polePivotY = cartY - cartH / 2;
+
+      const tipX = polePivotX + poleArmPx * Math.sin(cartPoleState.theta);
+      const tipY = polePivotY - poleArmPx * Math.cos(cartPoleState.theta);
+
+      // Rocket Booster Fuselage
+      ctx.save();
+      ctx.translate(polePivotX, polePivotY);
+      ctx.rotate(cartPoleState.theta);
+
+      // Main rocket body cylinder
+      ctx.fillStyle = '#f8fafc';
+      ctx.strokeStyle = '#0284c7';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(-5, -poleArmPx, 10, poleArmPx, [4, 4, 1, 1]);
+      ctx.fill();
+      ctx.stroke();
+
+      // Grid fins near top
+      ctx.fillStyle = '#475569';
+      ctx.fillRect(-11, -poleArmPx + 8, 22, 3);
+
+      // Thruster Nozzle at base
+      ctx.fillStyle = '#334155';
+      ctx.beginPath();
+      ctx.moveTo(-6, 0);
+      ctx.lineTo(6, 0);
+      ctx.lineTo(4, 8);
+      ctx.lineTo(-4, 8);
+      ctx.closePath();
+      ctx.fill();
+
+      // Active Gimbal Thruster Flame Plume (when |u| > 0.5N)
+      const forceMag = Math.abs(cartPoleState.u);
+      if (forceMag > 0.5) {
+        const flameLen = Math.min(35, 8 + forceMag * 1.2);
+        const flameGimbal = Math.max(-0.4, Math.min(0.4, -cartPoleState.u * 0.02));
+
+        ctx.save();
+        ctx.translate(0, 8);
+        ctx.rotate(flameGimbal);
+
+        // Core flame (white/cyan)
+        ctx.beginPath();
+        ctx.moveTo(-3, 0);
+        ctx.lineTo(3, 0);
+        ctx.lineTo(0, flameLen);
+        ctx.closePath();
+        ctx.fillStyle = '#38bdf8';
+        ctx.fill();
+
+        // Outer glow (amber/orange)
+        ctx.beginPath();
+        ctx.moveTo(-5, 0);
+        ctx.lineTo(5, 0);
+        ctx.lineTo(0, flameLen * 1.3);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(249, 115, 22, 0.7)';
+        ctx.fill();
+
+        ctx.restore();
+      }
+
+      ctx.restore();
+
+      // Gimbal Base Joint
+      ctx.beginPath();
+      ctx.arc(polePivotX, polePivotY, 4, 0, 2 * Math.PI);
+      ctx.fillStyle = '#38bdf8';
+      ctx.fill();
+
+      // Tip Payload Sensor
+      ctx.beginPath();
+      ctx.arc(tipX, tipY, 6, 0, 2 * Math.PI);
+      ctx.fillStyle = '#10b981';
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1;
+      ctx.stroke();
     }
-  }, [mechanism, activeTheta, lengthMeters, doubleState]);
+  }, [mechanism, activeTheta, lengthMeters, doubleState, cartPoleState, lqrTargetX]);
 
   // Energy Bar Gauges
   const maxBarEnergy = Math.max(0.01, simState.total * 1.15 || 0.5);
@@ -540,6 +769,20 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
             <Flame className="w-2.5 h-2.5 text-amber-300" />
             <span>2-DOF Chaos</span>
           </button>
+          <button
+            onClick={() => {
+              setMechanism('lqr');
+              setIsSimRunning(true);
+            }}
+            className={`px-2 py-0.5 rounded transition flex items-center gap-1 ${
+              mechanism === 'lqr'
+                ? 'bg-emerald-600 text-white font-semibold'
+                : 'text-graphite-400 hover:text-graphite-200 bg-graphite-800'
+            }`}
+          >
+            <Navigation className="w-2.5 h-2.5 text-emerald-300" />
+            <span>Rocket LQR</span>
+          </button>
         </div>
       </div>
 
@@ -574,7 +817,7 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
               </span>
             </div>
           </div>
-        ) : (
+        ) : mechanism === 'double' ? (
           <div className="absolute top-3 left-3 p-2 rounded bg-graphite-950/90 backdrop-blur-sm border border-graphite-800 font-mono text-[11px] space-y-1 shadow-sm pointer-events-none">
             <div className="flex items-center justify-between gap-4 text-graphite-400 text-[10px]">
               <span>ARM 1 θ₁</span>
@@ -597,6 +840,33 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
               </div>
             )}
           </div>
+        ) : (
+          <div className="absolute top-3 left-3 p-2 rounded bg-graphite-950/90 backdrop-blur-sm border border-emerald-500/30 font-mono text-[11px] space-y-1 shadow-sm pointer-events-none">
+            <div className="flex items-center justify-between gap-4 text-graphite-400 text-[10px]">
+              <span>CART POSITION x</span>
+              <span className="text-emerald-400 font-semibold tabular-nums">
+                {cartPoleState.x.toFixed(3)} m
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-4 text-graphite-400 text-[10px]">
+              <span>BOOSTER TILT θ</span>
+              <span className="text-cyan-400 font-semibold tabular-nums">
+                {radToDeg(cartPoleState.theta).toFixed(2)}°
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-4 text-graphite-400 text-[10px]">
+              <span>LQR FORCE u</span>
+              <span className="text-amber-400 font-bold tabular-nums">
+                {cartPoleState.u > 0 ? '+' : ''}{cartPoleState.u.toFixed(2)} N
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-4 text-graphite-400 text-[10px]">
+              <span>LQR GAIN K</span>
+              <span className="text-graphite-300 tabular-nums text-[9px]">
+                [{lqrModel.K.map((k) => Math.round(k)).join(', ')}]
+              </span>
+            </div>
+          </div>
         )}
 
         {/* Live / Video Sync Controls */}
@@ -613,7 +883,7 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
               <RefreshCw className="w-2.5 h-2.5" />
               <span>{isSyncedWithVideo ? 'SYNCED TO VIDEO' : 'FREE SANDBOX'}</span>
             </button>
-          ) : (
+          ) : mechanism === 'double' ? (
             <button
               onClick={triggerChaosPerturbation}
               className="px-2 py-1 rounded bg-purple-950/60 border border-purple-500/40 text-purple-300 hover:bg-purple-900/60 transition flex items-center gap-1 font-semibold"
@@ -621,6 +891,15 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
             >
               <Shuffle className="w-2.5 h-2.5 text-purple-400" />
               <span>Perturb +0.0001 rad</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => setLqrWindImpulse((w) => w + 14.0)}
+              className="px-2 py-1 rounded bg-amber-950/60 border border-amber-500/40 text-amber-300 hover:bg-amber-900/60 transition flex items-center gap-1 font-semibold"
+              title="Apply lateral +14N wind disturbance blast"
+            >
+              <Wind className="w-2.5 h-2.5 text-amber-400" />
+              <span>Wind Gust +14N</span>
             </button>
           )}
         </div>
@@ -663,7 +942,11 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
         <div className="flex items-center justify-between">
           <span className="text-graphite-200 font-semibold flex items-center gap-1.5 text-[11px]">
             <Sliders className="w-3 h-3 text-blue-400" />
-            {mechanism === 'single' ? 'COUNTERFACTUAL CONTROLS' : 'DOUBLE PENDULUM PARAMETERS'}
+            {mechanism === 'single'
+              ? 'COUNTERFACTUAL CONTROLS'
+              : mechanism === 'double'
+              ? 'DOUBLE PENDULUM PARAMETERS'
+              : 'ROCKET LANDING LQR PARAMETERS'}
           </span>
           <button
             onClick={handleResetToFitted}
@@ -777,6 +1060,30 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
             />
           </div>
         </div>
+
+        {/* LQR Specific Target Position Setpoint */}
+        {mechanism === 'lqr' && (
+          <div className="pt-2 border-t border-graphite-800/60">
+            <div className="flex justify-between text-graphite-400 text-[11px] mb-1">
+              <span className="flex items-center gap-1.5 text-emerald-400">
+                <Target className="w-3 h-3" />
+                Cart Position Setpoint (x*)
+              </span>
+              <span className="text-emerald-300 font-semibold tabular-nums">
+                {lqrTargetX > 0 ? '+' : ''}{lqrTargetX.toFixed(2)} m
+              </span>
+            </div>
+            <input
+              type="range"
+              min={-1.0}
+              max={1.0}
+              step={0.05}
+              value={lqrTargetX}
+              onChange={(e) => setLqrTargetX(Number(e.target.value))}
+              className="w-full h-1 bg-graphite-800 rounded appearance-none cursor-pointer accent-emerald-500"
+            />
+          </div>
+        )}
       </div>
     </div>
   );

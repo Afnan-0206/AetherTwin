@@ -127,7 +127,10 @@ export type BenchmarkPresetId =
   | 'nonlinear_large_amp'
   | 'overdamped'
   | 'lunar_gravity'
-  | 'aerodynamic_drag';
+  | 'aerodynamic_drag'
+  | 'taipei_101_tmd'
+  | 'rocket_landing_tvc'
+  | 'polymer_rheometer';
 
 export interface BenchmarkPresetInfo {
   id: BenchmarkPresetId;

@@ -7,14 +7,17 @@ import { fitDampedPendulum } from '../lib/physics/parameterFitter';
 import { rk4Step } from '../lib/physics/rk4';
 
 describe('Benchmark Presets & Quadratic Drag Integration', () => {
-  it('defines 5 unique benchmark scenarios with valid physical parameters', () => {
-    expect(BENCHMARK_PRESETS.length).toBe(5);
+  it('defines 8 unique multi-domain benchmark scenarios with valid physical parameters', () => {
+    expect(BENCHMARK_PRESETS.length).toBe(8);
     const ids = BENCHMARK_PRESETS.map((p) => p.id);
     expect(ids).toContain('standard');
     expect(ids).toContain('nonlinear_large_amp');
     expect(ids).toContain('overdamped');
     expect(ids).toContain('lunar_gravity');
     expect(ids).toContain('aerodynamic_drag');
+    expect(ids).toContain('taipei_101_tmd');
+    expect(ids).toContain('rocket_landing_tvc');
+    expect(ids).toContain('polymer_rheometer');
   });
 
   it('generates and fits the Large-Amplitude Non-Linear sample (theta_0 = 75 deg)', () => {

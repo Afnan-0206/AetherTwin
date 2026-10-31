@@ -78,6 +78,37 @@ export const BENCHMARK_PRESETS: BenchmarkPresetInfo[] = [
     damping: 0.06,
     dampingQuadratic: 0.08,
     gravity: 9.80665
+  },
+  {
+    id: 'taipei_101_tmd',
+    name: 'Taipei 101 Tuned Mass Damper',
+    tagline: 'M = 660t • Seismic & Typhoon Energy Dissipation',
+    description: 'Structural engineering giant pendulum damping wind & earthquake building sway.',
+    initialAngleDeg: 18.0,
+    lengthMeters: 4.20,
+    damping: 0.35,
+    gravity: 9.80665
+  },
+  {
+    id: 'rocket_landing_tvc',
+    name: 'Booster Rocket Inverted TVC',
+    tagline: 'L = 1.20m • Inverted Thrust Vectoring • Actuator Control',
+    description: 'Inverted pendulum booster stage balancing under rocket engine gimbal thrust.',
+    initialAngleDeg: 8.5,
+    lengthMeters: 1.20,
+    damping: 0.08,
+    gravity: 9.80665
+  },
+  {
+    id: 'polymer_rheometer',
+    name: 'Viscoelastic Fluid Rheometer',
+    tagline: 'Materials Science • Non-Newtonian Shear Viscosity',
+    description: 'Oscillatory rheometer extracting fluid loss modulus and polymer relaxation times.',
+    initialAngleDeg: 42.0,
+    lengthMeters: 0.30,
+    damping: 1.85,
+    dampingQuadratic: 0.22,
+    gravity: 9.80665
   }
 ];
 

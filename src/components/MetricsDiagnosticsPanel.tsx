@@ -27,17 +27,27 @@ import {
   Copy,
   Radio,
   Flame,
-  Waves
+  Waves,
+  Navigation,
+  Cpu,
+  Bot,
+  Send,
+  ShieldCheck
 } from 'lucide-react';
 import { ProvenanceBadge } from './ProvenanceBadge';
 import {
   generateTelemetryCSV,
   generatePythonReproductionScript,
   generateVerificationCertificateMarkdown,
+  generateRos2NodeScript,
+  generateArduinoCppFirmware,
+  generateMatlabSimulinkScript,
   downloadTextFile
 } from '@/lib/export/exportUtils';
 import { computeSpectralAnalysis } from '@/lib/physics/fft';
 import { simulateDoublePendulumChaos } from '@/lib/physics/doublePendulum';
+import { linearizeCartPole, DEFAULT_CARTPOLE_PARAMS } from '@/lib/physics/cartPoleLqr';
+import { answerCopilotPhysicalQuery } from '@/lib/meta/museSparkClient';
 
 interface MetricsDiagnosticsPanelProps {
   comparisonPoints: TrajectoryComparisonPoint[];
@@ -69,10 +79,24 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
   onSeekFrame
 }) => {
   const [activeTab, setActiveTab] = useState<
-    'charts' | 'phase' | 'energy' | 'spectrum' | 'chaos' | 'diagnostics' | 'export' | 'provenance'
+    'charts' | 'phase' | 'energy' | 'spectrum' | 'chaos' | 'control' | 'diagnostics' | 'export' | 'provenance'
   >('charts');
   const [hoveredPoint, setHoveredPoint] = useState<TrajectoryComparisonPoint | null>(null);
   const [copiedType, setCopiedType] = useState<string | null>(null);
+  const [aiQuestion, setAiQuestion] = useState<string>('');
+  const [aiAnswer, setAiAnswer] = useState<string | null>(null);
+  const [isAiLoading, setIsAiLoading] = useState<boolean>(false);
+
+  // Compute LQR State-Space Model for Inverted Rocket / Cart-Pole Control
+  const lqrModel = useMemo(() => {
+    const l = fittedParameters?.length ?? 0.5;
+    const g = fittedParameters?.gravity ?? (fittedParameters ? fittedParameters.omega0Sq * l : 9.81);
+    return linearizeCartPole({
+      ...DEFAULT_CARTPOLE_PARAMS,
+      poleLength: l,
+      gravity: g
+    });
+  }, [fittedParameters]);
 
   // Compute Fast Fourier Transform / Spectral Analysis
   const spectralResult = useMemo(() => {
@@ -114,6 +138,39 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
       30
     );
   }, [fittedParameters]);
+
+  const handleCopilotSubmit = (queryText: string) => {
+    setIsAiLoading(true);
+    try {
+      const answer = answerCopilotPhysicalQuery(queryText, {
+        parameters: fittedParameters ?? undefined,
+        metrics: metrics ?? undefined,
+        lqrModel: lqrModel
+          ? {
+              K: lqrModel.K,
+              closedLoopPoles: lqrModel.closedLoopPoles,
+              isStable: lqrModel.isStable
+            }
+          : undefined,
+        spectral: spectralResult
+          ? {
+              fundamentalFrequencyHz: spectralResult.fundamentalFrequencyHz,
+              harmonicRatio: spectralResult.harmonicRatio,
+              dominantHarmonicHz: spectralResult.dominantHarmonicHz
+            }
+          : undefined,
+        chaosHorizon: chaosResult
+          ? {
+              lyapunovHorizonSeconds: chaosResult.lyapunovHorizonSeconds,
+              isChaotic: chaosResult.isChaotic
+            }
+          : undefined
+      });
+      setAiAnswer(answer);
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
 
   if (comparisonPoints.length === 0 || !metrics) {
     return (
@@ -344,6 +401,17 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
           >
             <Flame className="w-2.5 h-2.5 text-amber-400" />
             <span>CHAOS</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('control')}
+            className={`px-2 py-0.5 rounded transition flex items-center gap-1 ${
+              activeTab === 'control'
+                ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-500/30 font-semibold'
+                : 'text-graphite-400 hover:text-graphite-200'
+            }`}
+          >
+            <Navigation className="w-2.5 h-2.5 text-emerald-400" />
+            <span>CONTROL</span>
           </button>
           <button
             onClick={() => setActiveTab('diagnostics')}
@@ -1104,7 +1172,116 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
           </div>
         )}
 
-        {/* TAB 6: MUSE SPARK AI DIAGNOSTICS */}
+        {/* TAB 6: LQR STATE-SPACE & OPTIMAL CONTROL */}
+        {activeTab === 'control' && (
+          <div className="space-y-3 font-mono text-xs">
+            <div className="p-3 rounded bg-graphite-850 border border-graphite-800">
+              <div className="flex items-center justify-between pb-2 mb-2 border-b border-graphite-800">
+                <div className="flex items-center gap-2">
+                  <Navigation className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="font-semibold text-graphite-100 text-xs">
+                    STATE-SPACE LQR INVERTED STABILIZER
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 text-[9px]">
+                  <span className="px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 font-bold">
+                    {lqrModel.isStable ? 'HURWITZ STABLE' : 'UNSTABLE'}
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-graphite-400 leading-relaxed mb-3">
+                Continuous Algebraic Riccati Equation (CARE) optimal state feedback: <code className="text-emerald-300 font-semibold">u(t) = -K &middot; x(t)</code>. Derived analytically from identified physical parameters to balance inverted rockets and cart-pole actuators.
+              </p>
+
+              {/* LQR Feedback Gain Vector K */}
+              <div className="p-2.5 rounded bg-graphite-900 border border-graphite-800 mb-3">
+                <div className="text-[9px] text-graphite-500 uppercase tracking-wider mb-1 font-semibold">
+                  OPTIMAL LQR FEEDBACK GAIN MATRIX K
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-[10px]">
+                  <div className="p-1.5 rounded bg-graphite-950 border border-graphite-850">
+                    <span className="text-graphite-500 block text-[9px]">K_x (Position)</span>
+                    <span className="text-emerald-400 font-bold tabular-nums">{lqrModel.K[0]}</span>
+                  </div>
+                  <div className="p-1.5 rounded bg-graphite-950 border border-graphite-850">
+                    <span className="text-graphite-500 block text-[9px]">K_v (Cart Vel)</span>
+                    <span className="text-emerald-400 font-bold tabular-nums">{lqrModel.K[1]}</span>
+                  </div>
+                  <div className="p-1.5 rounded bg-graphite-950 border border-graphite-850">
+                    <span className="text-graphite-500 block text-[9px]">K_θ (Tilt Angle)</span>
+                    <span className="text-cyan-400 font-bold tabular-nums">{lqrModel.K[2]}</span>
+                  </div>
+                  <div className="p-1.5 rounded bg-graphite-950 border border-graphite-850">
+                    <span className="text-graphite-500 block text-[9px]">K_ω (Angular Vel)</span>
+                    <span className="text-cyan-400 font-bold tabular-nums">{lqrModel.K[3]}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Closed-Loop Poles Verification */}
+              <div className="p-2.5 rounded bg-graphite-900 border border-graphite-800 mb-3">
+                <div className="flex items-center justify-between text-[9px] text-graphite-500 uppercase tracking-wider mb-1 font-semibold">
+                  <span>CLOSED-LOOP EIGENVALUES [λ(A - BK)]</span>
+                  <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                    <ShieldCheck className="w-2.5 h-2.5" />
+                    Re(λ) &lt; 0 Asymptotically Stable
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px]">
+                  {lqrModel.closedLoopPoles.map((pole, idx) => (
+                    <div key={idx} className="p-1.5 rounded bg-graphite-950 border border-graphite-850 text-center">
+                      <span className="text-graphite-500 block text-[9px]">Pole {idx + 1}</span>
+                      <span className="text-purple-300 font-bold tabular-nums">
+                        {pole.real} {pole.imag >= 0 ? `+ ${pole.imag}i` : `- ${Math.abs(pole.imag)}i`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Export Direct Hardware Exporters */}
+              <div className="pt-2 border-t border-graphite-800 flex flex-wrap items-center gap-2">
+                <span className="text-[10px] text-graphite-400 font-semibold mr-1">HARDWARE CODE:</span>
+                <button
+                  onClick={() => {
+                    if (!fittedParameters) return;
+                    const ros = generateRos2NodeScript(fittedParameters, lqrModel);
+                    downloadTextFile('aethertwin_lqr_node.py', ros, 'text/x-python');
+                  }}
+                  className="px-2.5 py-1 rounded bg-graphite-800 hover:bg-graphite-750 text-graphite-200 border border-graphite-700 text-[10px] flex items-center gap-1 transition"
+                >
+                  <Cpu className="w-3 h-3 text-emerald-400" />
+                  <span>ROS 2 Node (.py)</span>
+                </button>
+                <button
+                  onClick={() => {
+                    if (!fittedParameters) return;
+                    const ino = generateArduinoCppFirmware(fittedParameters, lqrModel);
+                    downloadTextFile('aethertwin_controller.ino', ino, 'text/x-c');
+                  }}
+                  className="px-2.5 py-1 rounded bg-graphite-800 hover:bg-graphite-750 text-graphite-200 border border-graphite-700 text-[10px] flex items-center gap-1 transition"
+                >
+                  <FileCode className="w-3 h-3 text-cyan-400" />
+                  <span>Arduino C++ (.ino)</span>
+                </button>
+                <button
+                  onClick={() => {
+                    if (!fittedParameters) return;
+                    const m = generateMatlabSimulinkScript(fittedParameters, lqrModel);
+                    downloadTextFile('design_lqr.m', m, 'text/plain');
+                  }}
+                  className="px-2.5 py-1 rounded bg-graphite-800 hover:bg-graphite-750 text-graphite-200 border border-graphite-700 text-[10px] flex items-center gap-1 transition"
+                >
+                  <FileText className="w-3 h-3 text-amber-400" />
+                  <span>MATLAB / Simulink (.m)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 7: MUSE SPARK AI DIAGNOSTICS */}
         {activeTab === 'diagnostics' && (
           <div className="space-y-3 font-mono text-xs">
             <div className="p-2.5 rounded bg-amber-950/20 border border-amber-500/30 flex items-start gap-2.5">
@@ -1188,6 +1365,76 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
                 Generating Muse Spark physical diagnosis...
               </div>
             )}
+
+            {/* INTERACTIVE PHYSICAL COPILOT Q&A */}
+            <div className="p-3 rounded bg-graphite-850 border border-graphite-800 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-amber-300 font-semibold text-[11px]">
+                  <Bot className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Physical AI Copilot (Q&A)</span>
+                </div>
+                <ProvenanceBadge kind="MODEL_GENERATED" />
+              </div>
+              <p className="text-[10px] text-graphite-400 leading-relaxed">
+                Interrogate the physical reasoning engine on dynamic stability, disturbance margins, harmonic distortion, or energy dissipation.
+              </p>
+
+              {/* Quick prompt chips */}
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {[
+                  'LQR control authority & wind rejection',
+                  'Energy dissipation rate & damping regime',
+                  'Fourier 3rd harmonic spectral distortion',
+                  'Holdout test generalization vs overfitting',
+                  'Taipei 101 TMD structural damper resonance',
+                  'Deterministic chaos & Lyapunov horizon'
+                ].map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => {
+                      setAiQuestion(prompt);
+                      handleCopilotSubmit(prompt);
+                    }}
+                    className="px-2 py-0.5 rounded bg-graphite-800 hover:bg-graphite-750 text-graphite-300 hover:text-amber-300 border border-graphite-700 text-[9px] transition"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+
+              {/* Input bar */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (aiQuestion.trim()) handleCopilotSubmit(aiQuestion.trim());
+                }}
+                className="flex items-center gap-2 pt-1"
+              >
+                <input
+                  type="text"
+                  value={aiQuestion}
+                  onChange={(e) => setAiQuestion(e.target.value)}
+                  placeholder="Ask about physical dynamics, control gains, or harmonics..."
+                  className="flex-1 bg-graphite-900 border border-graphite-750 rounded px-2.5 py-1 text-xs text-graphite-100 placeholder-graphite-500 focus:outline-none focus:border-amber-500/60 font-mono"
+                />
+                <button
+                  type="submit"
+                  disabled={isAiLoading || !aiQuestion.trim()}
+                  className="px-3 py-1 rounded bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-graphite-950 font-semibold text-xs transition flex items-center gap-1 shrink-0"
+                >
+                  <Send className="w-3 h-3" />
+                  <span>Analyze</span>
+                </button>
+              </form>
+
+              {/* Copilot Response display */}
+              {aiAnswer && (
+                <div className="p-2.5 rounded bg-amber-950/20 border border-amber-500/30 text-amber-200 text-[11px] leading-relaxed whitespace-pre-line font-mono mt-2">
+                  {aiAnswer}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -1203,7 +1450,7 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
                 Download raw empirical angles, fitted trajectory coordinates, baseline benchmark points, standalone Python simulation scripts, or a formal Verification Certificate.
               </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
                 <button
                   onClick={() => {
                     const csv = generateTelemetryCSV(comparisonPoints);
@@ -1242,6 +1489,45 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
                 >
                   <CheckCircle className="w-3.5 h-3.5 text-amber-400" />
                   <span>Certificate (.md)</span>
+                </button>
+              </div>
+
+              {/* Hardware & Robotics Edge Code Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <button
+                  onClick={() => {
+                    if (!fittedParameters) return;
+                    const ros = generateRos2NodeScript(fittedParameters, lqrModel);
+                    downloadTextFile('aethertwin_lqr_node.py', ros, 'text/x-python');
+                  }}
+                  className="px-3 py-2 rounded bg-graphite-800 hover:bg-graphite-750 text-graphite-200 border border-graphite-700 flex items-center justify-center gap-1.5 transition text-[11px]"
+                >
+                  <Cpu className="w-3.5 h-3.5 text-teal-400" />
+                  <span>ROS 2 Node (.py)</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (!fittedParameters) return;
+                    const ino = generateArduinoCppFirmware(fittedParameters, lqrModel);
+                    downloadTextFile('aethertwin_controller.ino', ino, 'text/x-c');
+                  }}
+                  className="px-3 py-2 rounded bg-graphite-800 hover:bg-graphite-750 text-graphite-200 border border-graphite-700 flex items-center justify-center gap-1.5 transition text-[11px]"
+                >
+                  <FileCode className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Arduino C++ (.ino)</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (!fittedParameters) return;
+                    const m = generateMatlabSimulinkScript(fittedParameters, lqrModel);
+                    downloadTextFile('design_lqr.m', m, 'text/plain');
+                  }}
+                  className="px-3 py-2 rounded bg-graphite-800 hover:bg-graphite-750 text-graphite-200 border border-graphite-700 flex items-center justify-center gap-1.5 transition text-[11px]"
+                >
+                  <FileText className="w-3.5 h-3.5 text-purple-400" />
+                  <span>MATLAB / Simulink (.m)</span>
                 </button>
               </div>
             </div>

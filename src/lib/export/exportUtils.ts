@@ -5,6 +5,7 @@ import {
   CalibrationConfig,
   ProvenanceLogEntry
 } from '../types';
+import { StateSpaceModel } from '../physics/cartPoleLqr';
 
 /**
  * Generates CSV string of full trajectory telemetry.
@@ -188,6 +189,197 @@ ${provenance
 
 ---
 *Signed by AetherTwin Deterministic Verification Engine.*
+`;
+}
+
+/**
+ * Generates production-ready ROS 2 Humble Python Control Node script
+ */
+export function generateRos2NodeScript(
+  params: PendulumParameters,
+  lqrModel: StateSpaceModel
+): string {
+  const kArr = lqrModel.K.map((k) => k.toFixed(3));
+  return `#!/usr/bin/env python3
+"""
+AetherTwin — ROS 2 Humble Hardware-in-the-Loop Node
+Generated automatically from Meta SAM 3.1 & Muse Spark parameter identification.
+Implements Linear Quadratic Regulator (LQR) State-Space Feedback: u(t) = -K * x(t)
+"""
+
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import JointState
+from std_msgs.msg import Float64
+import numpy as np
+
+class AetherTwinLqrNode(Node):
+    def __init__(self):
+        super().__init__('aethertwin_lqr_controller')
+        
+        # Optimal LQR Feedback Gain Matrix K = [kx, kv, k_theta, k_omega]
+        self.K = np.array([${kArr.join(', ')}])
+        self.target_position = 0.0
+        self.max_force = 25.0  # Newtons
+        
+        # Subscriptions & Publishers
+        self.sub_state = self.create_subscription(JointState, '/joint_states', self.state_callback, 10)
+        self.pub_effort = self.create_publisher(Float64, '/cmd_force', 10)
+        
+        self.get_logger().info(f"[AetherTwin] LQR Controller initialized with gains: {self.K}")
+
+    def state_callback(self, msg: JointState):
+        try:
+            # State vector: [x, v, theta, omega]
+            x = float(msg.position[0])
+            v = float(msg.velocity[0]) if len(msg.velocity) > 0 else 0.0
+            theta = float(msg.position[1])
+            omega = float(msg.velocity[1]) if len(msg.velocity) > 1 else 0.0
+            
+            state_error = np.array([x - self.target_position, v, theta, omega])
+            
+            # LQR Control Law: u = -K * e
+            u = -float(np.dot(self.K, state_error))
+            u_clamped = max(-self.max_force, min(self.max_force, u))
+            
+            cmd = Float64()
+            cmd.data = u_clamped
+            self.pub_effort.publish(cmd)
+        except Exception as e:
+            self.get_logger().warn(f"Telemetry parse error: {e}")
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = AetherTwinLqrNode()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+`;
+}
+
+/**
+ * Generates standalone C++ / Arduino embedded firmware for microcontrollers (ESP32/Teensy/Arduino)
+ */
+export function generateArduinoCppFirmware(
+  params: PendulumParameters,
+  lqrModel: StateSpaceModel
+): string {
+  return `/**
+ * AetherTwin — Embedded Microcontroller Firmware (C++ / Arduino)
+ * Target: Teensy 4.0 / ESP32 / STM32 / Arduino Due
+ * Control Frequency: 100 Hz (10ms discrete control cycle)
+ */
+
+#include <Arduino.h>
+
+// Optimal LQR Feedback Gains: K = [kx, kv, k_theta, k_omega]
+const float K_X = ${lqrModel.K[0]}f;
+const float K_V = ${lqrModel.K[1]}f;
+const float K_THETA = ${lqrModel.K[2]}f;
+const float K_OMEGA = ${lqrModel.K[3]}f;
+
+const float MAX_FORCE_PWM = 255.0f;
+const float MAX_FORCE_NEWTONS = 25.0f;
+const float TARGET_POSITION = 0.0f;
+
+// Pin Definitions
+const int PIN_PWM_A = 5;
+const int PIN_PWM_B = 6;
+
+volatile float cart_x = 0.0f;
+volatile float cart_v = 0.0f;
+volatile float pole_theta = 0.0f;
+volatile float pole_omega = 0.0f;
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(PIN_PWM_A, OUTPUT);
+  pinMode(PIN_PWM_B, OUTPUT);
+  Serial.println(F("[AetherTwin] LQR Inverted Stabilizer Active."));
+}
+
+void loop() {
+  static unsigned long last_us = 0;
+  unsigned long now = micros();
+  
+  if (now - last_us >= 10000) { // 100 Hz loop (dt = 10ms)
+    float dt = (now - last_us) * 1e-6f;
+    last_us = now;
+
+    // 1. Read Sensor State (Replace with your encoder/IMU read routine)
+    // cart_x = readCartMeters();
+    // pole_theta = readPoleRadians();
+
+    // 2. Compute LQR Control Law: u = -K * (x - x_target)
+    float e_x = cart_x - TARGET_POSITION;
+    float u = -(K_X * e_x + K_V * cart_v + K_THETA * pole_theta + K_OMEGA * pole_omega);
+
+    // 3. Actuator Saturation Clamp
+    if (u > MAX_FORCE_NEWTONS) u = MAX_FORCE_NEWTONS;
+    if (u < -MAX_FORCE_NEWTONS) u = -MAX_FORCE_NEWTONS;
+
+    // 4. Drive H-Bridge Motor / Thrust Vector Actuator
+    int pwm = (int)(abs(u) / MAX_FORCE_NEWTONS * MAX_FORCE_PWM);
+    if (u >= 0) {
+      analogWrite(PIN_PWM_A, pwm);
+      analogWrite(PIN_PWM_B, 0);
+    } else {
+      analogWrite(PIN_PWM_A, 0);
+      analogWrite(PIN_PWM_B, pwm);
+    }
+  }
+}
+`;
+}
+
+/**
+ * Generates MATLAB / Simulink state-space design script
+ */
+export function generateMatlabSimulinkScript(
+  params: PendulumParameters,
+  lqrModel: StateSpaceModel
+): string {
+  const formatRow = (row: number[]) => '  ' + row.map((v) => v.toFixed(5)).join('  ');
+  return `%% AetherTwin — MATLAB / Simulink State-Space & LQR Design Script
+% Generated from Meta SAM 3.1 & Muse Spark parameter identification
+clear; clc; close all;
+
+%% 1. Continuous State-Space Matrices: dx/dt = A*x + B*u
+A = [
+${lqrModel.A.map(formatRow).join(';\n')}
+];
+
+B = [
+${lqrModel.B.map((v) => '  ' + v.toFixed(5)).join(';\n')}
+];
+
+C = eye(4);
+D = zeros(4, 1);
+
+sys_ol = ss(A, B, C, D);
+
+%% 2. LQR Cost Weighting Matrices
+Q = diag([${lqrModel.Q[0][0]}, ${lqrModel.Q[1][1]}, ${lqrModel.Q[2][2]}, ${lqrModel.Q[3][3]}]);
+R = ${lqrModel.R};
+
+%% 3. Optimal Feedback Gain
+[K, S, P] = lqr(A, B, Q, R);
+disp('Identified Optimal LQR Gains:');
+disp(K);
+
+%% 4. Closed-Loop System Validation
+sys_cl = ss(A - B*K, B, C, D);
+figure('Name', 'AetherTwin Closed-Loop Impulse Response');
+impulse(sys_cl);
+grid on;
+title('LQR Inverted Pendulum / Booster TVC Disturbance Rejection');
 `;
 }
 
