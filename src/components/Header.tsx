@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Play, Upload, RotateCcw, HelpCircle, Ruler, Activity, Layers, Volume2, VolumeX, LayoutDashboard, Grid3X3, Sparkles } from 'lucide-react';
+import { Play, Upload, RotateCcw, HelpCircle, Ruler, Activity, Layers, Volume2, VolumeX, LayoutDashboard, Grid3X3, Sparkles, Brain, Cpu } from 'lucide-react';
 import { BenchmarkPresetId } from '@/lib/types';
 import { BENCHMARK_PRESETS } from '@/lib/sample/syntheticPendulum';
 
@@ -14,6 +14,8 @@ interface HeaderProps {
   onOpenHelp: () => void;
   onOpenCalibration?: () => void;
   onOpenTour?: () => void;
+  onOpenMetaStack?: () => void;
+  onOpenFirmware?: () => void;
   isProcessing: boolean;
   hasData: boolean;
   isDemoMode: boolean;
@@ -33,6 +35,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenHelp,
   onOpenCalibration,
   onOpenTour,
+  onOpenMetaStack,
+  onOpenFirmware,
   isProcessing,
   hasData,
   isDemoMode,
@@ -73,8 +77,8 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Mode Indicator */}
-          <div className="hidden sm:flex items-center ml-2 pl-3 border-l border-graphite-800/60">
+          {/* Mode Indicator & Meta Stack Link */}
+          <div className="hidden sm:flex items-center ml-2 pl-3 border-l border-graphite-800/60 gap-1.5">
             {isDemoMode ? (
               <div
                 className="flex items-center gap-1.5 px-2 py-1 rounded bg-amber-500/5 border border-amber-500/15 text-amber-300/80 text-[10px] font-mono"
@@ -91,6 +95,18 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-heartbeat" />
                 <span>LIVE API</span>
               </div>
+            )}
+
+            {onOpenMetaStack && (
+              <button
+                type="button"
+                onClick={onOpenMetaStack}
+                className="flex items-center gap-1 px-2 py-1 rounded bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/25 text-purple-300 text-[10px] font-mono transition"
+                title="Inspect Meta SAM 3.1 & Llama 3.3 dual-model pipeline"
+              >
+                <Brain className="w-3 h-3 text-purple-400" />
+                <span className="hidden xl:inline">Meta AI Stack</span>
+              </button>
             )}
           </div>
         </div>
@@ -206,6 +222,17 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Sparkles className="w-3.5 h-3.5 text-blue-400" />
               <span className="hidden sm:inline">Tour</span>
+            </button>
+          )}
+
+          {onOpenFirmware && (
+            <button
+              onClick={onOpenFirmware}
+              className="focus-ring px-2.5 py-1.5 rounded bg-emerald-950/40 hover:bg-emerald-900/40 text-emerald-300 border border-emerald-500/30 text-[11px] font-mono transition-colors flex items-center gap-1.5"
+              title="Open 100Hz Edge Microcontroller Firmware Emulator & WebSerial"
+            >
+              <Cpu className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden sm:inline">Firmware</span>
             </button>
           )}
 

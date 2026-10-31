@@ -10,6 +10,8 @@ import { CalibrationModal } from '@/components/CalibrationModal';
 import { UploadModal } from '@/components/UploadModal';
 import { HelpModal } from '@/components/HelpModal';
 import { GuidedTourModal } from '@/components/GuidedTourModal';
+import { MetaArchitectureModal } from '@/components/MetaArchitectureModal';
+import { EdgeFirmwareModal } from '@/components/EdgeFirmwareModal';
 import { PhysicsTelemetryBento } from '@/components/ui/physics-telemetry-bento';
 import AnalyticsBentoDemo from '@/components/ui/demo';
 import {
@@ -32,7 +34,8 @@ import {
 import { fitDampedPendulum } from '@/lib/physics/parameterFitter';
 import { trackVideoInBrowser } from '@/lib/cv/opticalTracker';
 import { physicsAudio } from '@/lib/audio/physicsAudio';
-import { Play, Upload, Activity, ShieldCheck, ChevronRight, Layers, Compass, Zap, Cpu, Sparkles } from 'lucide-react';
+import { linearizeCartPole, DEFAULT_CARTPOLE_PARAMS } from '@/lib/physics/cartPoleLqr';
+import { Play, Upload, Activity, ShieldCheck, ChevronRight, Layers, Compass, Zap, Cpu, Sparkles, Brain } from 'lucide-react';
 
 export default function Home() {
   // Analytical state
@@ -83,9 +86,20 @@ export default function Home() {
   const [isUploadOpen, setIsUploadOpen] = useState<boolean>(false);
   const [isHelpOpen, setIsHelpOpen] = useState<boolean>(false);
   const [isTourOpen, setIsTourOpen] = useState<boolean>(false);
+  const [isMetaStackOpen, setIsMetaStackOpen] = useState<boolean>(false);
+  const [isFirmwareOpen, setIsFirmwareOpen] = useState<boolean>(false);
   const [isDemoMode, setIsDemoMode] = useState<boolean>(true);
   const [isDraggingFile, setIsDraggingFile] = useState<boolean>(false);
   const [droppedFile, setDroppedFile] = useState<File | null>(null);
+
+  // Compute LQR State-Space model for edge firmware export
+  const lqrModel = React.useMemo(() => {
+    return linearizeCartPole({
+      ...DEFAULT_CARTPOLE_PARAMS,
+      poleLength: fittedParameters?.length ?? 0.5,
+      gravity: fittedParameters?.gravity ?? 9.81
+    });
+  }, [fittedParameters]);
 
   // Global Drag & Drop video handler
   useEffect(() => {
@@ -523,6 +537,8 @@ export default function Home() {
         onOpenHelp={() => setIsHelpOpen(true)}
         onOpenCalibration={() => setIsCalibrationOpen(true)}
         onOpenTour={() => setIsTourOpen(true)}
+        onOpenMetaStack={() => setIsMetaStackOpen(true)}
+        onOpenFirmware={() => setIsFirmwareOpen(true)}
         isProcessing={['segmenting', 'measuring', 'fitting', 'validating', 'diagnosing'].includes(stage)}
         hasData={measurements.length > 0}
         isDemoMode={isDemoMode}
@@ -676,6 +692,24 @@ export default function Home() {
                 <Sparkles className="w-4 h-4 text-blue-400" />
                 <span>Guided Tour</span>
               </button>
+
+              <button
+                onClick={() => setIsMetaStackOpen(true)}
+                className="focus-ring px-3.5 py-2.5 rounded-lg bg-purple-950/40 hover:bg-purple-900/40 text-purple-300 border border-purple-500/30 font-mono text-sm transition-all flex items-center gap-1.5"
+                title="Inspect Meta SAM 3.1 & Llama 3.3 Architecture"
+              >
+                <Brain className="w-4 h-4 text-purple-400" />
+                <span>Meta AI Stack</span>
+              </button>
+
+              <button
+                onClick={() => setIsFirmwareOpen(true)}
+                className="focus-ring px-3.5 py-2.5 rounded-lg bg-emerald-950/40 hover:bg-emerald-900/40 text-emerald-300 border border-emerald-500/30 font-mono text-sm transition-all flex items-center gap-1.5"
+                title="Open 100Hz Edge Microcontroller Firmware Emulator"
+              >
+                <Cpu className="w-4 h-4 text-emerald-400" />
+                <span>Edge Firmware</span>
+              </button>
             </div>
 
             {/* Quick Switch to Bento */}
@@ -780,6 +814,19 @@ export default function Home() {
       <HelpModal
         isOpen={isHelpOpen}
         onClose={() => setIsHelpOpen(false)}
+      />
+
+      <MetaArchitectureModal
+        isOpen={isMetaStackOpen}
+        onClose={() => setIsMetaStackOpen(false)}
+        isDemoMode={isDemoMode}
+      />
+
+      <EdgeFirmwareModal
+        isOpen={isFirmwareOpen}
+        onClose={() => setIsFirmwareOpen(false)}
+        parameters={fittedParameters}
+        lqrModel={lqrModel}
       />
 
       {/* Global Drag-and-Drop Ingest Overlay */}

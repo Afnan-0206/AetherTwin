@@ -2,7 +2,7 @@
 
 [![Next.js](https://img.shields.io/badge/Next.js-14.2.18-black?logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue?logo=typescript)](https://www.typescriptlang.org/)
-[![Vitest](https://img.shields.io/badge/Vitest-59%20Passed-brightgreen?logo=vitest)](https://vitest.dev/)
+[![Vitest](https://img.shields.io/badge/Vitest-64%20Passed-brightgreen?logo=vitest)](https://vitest.dev/)
 [![Meta SAM 3.1](https://img.shields.io/badge/Meta%20AI-SAM%203.1-0668E1?logo=meta)](https://ai.meta.com/)
 [![Meta Muse Spark](https://img.shields.io/badge/Meta%20AI-Muse%20Spark%201.3-E10668?logo=meta)](https://ai.meta.com/)
 [![ROS 2](https://img.shields.io/badge/Robotics-ROS%202%20Humble-22314E?logo=ros)](https://www.ros.org/)
@@ -65,7 +65,34 @@ flowchart TD
 - Mathematically verifies asymptotic Hurwitz stability: $\text{Re}(\lambda_i(\mathbf{A} - \mathbf{B}\mathbf{K})) < 0$.
 - Real-time $u(t) = -\mathbf{K}(\mathbf{x} - \mathbf{x}_{\text{target}})$ control loop with actuator saturation clamping ($\pm 25$ N) and interactive wind gust perturbation testing ($+14$ N).
 
-### 2. Multi-Domain Frontier Benchmarks
+### 2. Cyber-Physical Industrial Archetypes (`src/lib/physics/archetypes.ts`)
+AetherTwin extends beyond simple laboratory pendulums into production cyber-physical archetypes:
+1. **Aerospace — Orbital Booster Thrust Vector Control (TVC):**
+   - Inverted rocket booster fuselage actively rotating gimbaled engine nozzle ($\pm 8^\circ$) to stabilize against atmospheric wind shear gusts ($+15$ kN) during vertical propulsive landing.
+2. **Industrial Logistics — Harbor Gantry Crane Anti-Sway:**
+   - Automated shipping container hoist using predictive trolley rail acceleration to eliminate dangerous container pendulation during high-throughput port transfer.
+3. **Biomedical Robotics — Prosthetic Knee Joint:**
+   - Active micro-controller powered prosthetic joint with variable mechanical impedance matching human gait kinematics.
+4. **Canonical Benchmark — Inverted Cart-Pole:**
+   - The classical underactuated mechanical benchmark for Continuous Algebraic Riccati Equation (CARE) verification.
+5. **Coupled Chaos — Dual-Link Arm:**
+   - Multi-link robotic arm demonstrating sensitivity to initial conditions and finite-time Lyapunov exponent divergence.
+6. **Laboratory Optical Motion Twin:**
+   - High-precision calibration reference with sub-pixel Pratt circle fitting and zero data leakage.
+
+### 3. Extended Kalman Filter (EKF) State Observer (`src/lib/physics/kalmanFilter.ts`)
+- Fuses noisy 30–60 Hz optical camera centroids ($z_t = \mathbf{C}\mathbf{x}_t + v_t$) with non-linear ODE dynamics:
+  $$\mathbf{P}^- = \mathbf{F}\mathbf{P}\mathbf{F}^T + \mathbf{Q}, \quad \mathbf{K}_{\text{kalman}} = \mathbf{P}^-\mathbf{C}^T(\mathbf{C}\mathbf{P}^-\mathbf{C}^T + \mathbf{R})^{-1}$$
+- Live toggles for **simulated optical sensor jitter** ($\pm 0.05$ rad tracking noise) and **EKF covariance convergence** displayed directly on the interactive viewport.
+- Real-time Phase Space Orbit Portrait ($\theta$ vs $\dot{\theta}$) rendering stability spirals towards the $(0, 0)$ equilibrium attractor.
+
+### 4. Interactive Edge Firmware Emulator & Hardware Serial Loop (`src/components/EdgeFirmwareModal.tsx`)
+- Virtual 100 Hz embedded serial terminal streaming simulated microcontroller telemetry packets:
+  `$TELEM,t=0.010,x=0.002,v=-0.012,th=0.045,om=0.120,u=-4.32*4A`
+- **WebSerial API Integration**: One-click connection to physical hardware microcontrollers (Arduino / ESP32 / STM32) over USB.
+- Export ready-to-flash `.ino` C++ firmware and ROS 2 Humble Python nodes.
+
+### 5. Multi-Domain Frontier Benchmarks
 AetherTwin provides 8 validated physical presets spanning critical engineering frontiers:
 1. **Aerospace & Robotics — Falcon 9 Inverted TVC Booster:**
    - 0.50m equivalent inverted booster with thrust-vector gimbal control.

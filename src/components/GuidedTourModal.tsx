@@ -226,3 +226,4 @@ export const GuidedTourModal: React.FC<GuidedTourModalProps> = ({
     </div>
   );
 };
+

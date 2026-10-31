@@ -13,6 +13,14 @@ import {
   computeLqrControlForce
 } from '@/lib/physics/cartPoleLqr';
 import { physicsAudio } from '@/lib/audio/physicsAudio';
+import { TwinArchetypeId, TWIN_ARCHETYPES } from '@/lib/physics/archetypes';
+import {
+  createKalmanState,
+  kalmanPredict,
+  kalmanUpdate,
+  DEFAULT_KALMAN_CONFIG,
+  KalmanState
+} from '@/lib/physics/kalmanFilter';
 import {
   RotateCcw,
   Sliders,
@@ -24,7 +32,13 @@ import {
   Shuffle,
   Navigation,
   Wind,
-  Target
+  Target,
+  Rocket,
+  Building2,
+  Binary,
+  Radio,
+  Orbit,
+  Zap
 } from 'lucide-react';
 import { ProvenanceBadge } from './ProvenanceBadge';
 
@@ -50,6 +64,14 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
 
   // Mechanism Mode: 1-DOF Planar vs 2-DOF Chaotic Double vs 2-DOF Inverted Cart-Pole / TVC
   const [mechanism, setMechanism] = useState<'single' | 'double' | 'lqr'>('single');
+  const [archetype, setArchetype] = useState<TwinArchetypeId>('single_pendulum');
+
+  // Extended Kalman Filter (EKF) State Observer & Real-Time Noise State
+  const [isKalmanActive, setIsKalmanActive] = useState<boolean>(false);
+  const [isNoiseActive, setIsNoiseActive] = useState<boolean>(false);
+  const [showPhasePortrait, setShowPhasePortrait] = useState<boolean>(false);
+  const [kalmanState, setKalmanState] = useState<KalmanState>(() => createKalmanState([0, 0, 0.06, 0], 0.05));
+  const [phaseHistory, setPhaseHistory] = useState<{ theta: number; omega: number }[]>([]);
 
   // LQR Cart-Pole / Rocket Landing TVC state
   const [cartPoleState, setCartPoleState] = useState<CartPoleState>({
@@ -61,6 +83,36 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
   });
   const [lqrTargetX, setLqrTargetX] = useState<number>(0.0);
   const [lqrWindImpulse, setLqrWindImpulse] = useState<number>(0.0);
+
+  const handleSelectArchetype = (arcId: TwinArchetypeId) => {
+    setArchetype(arcId);
+    if (arcId === 'single_pendulum') {
+      setMechanism('single');
+    } else if (arcId === 'double_pendulum') {
+      setMechanism('double');
+      setIsSimRunning(true);
+    } else {
+      setMechanism('lqr');
+      setIsSimRunning(true);
+    }
+  };
+
+  const handleInjectDisturbance = () => {
+    if (mechanism === 'single') {
+      setSimState((prev) => ({
+        ...prev,
+        omega: prev.omega + 2.5
+      }));
+    } else if (mechanism === 'double') {
+      setDoubleState((prev) => ({
+        ...prev,
+        om2: prev.om2 + 4.0
+      }));
+    } else {
+      const mag = TWIN_ARCHETYPES[archetype]?.disturbanceMagnitude ?? 15.0;
+      setLqrWindImpulse((prev) => (Math.abs(prev) > 0.1 ? -prev : mag));
+    }
+  };
 
   // Single Pendulum Parameters
   const defaultGravity = fittedParameters?.gravity ?? 9.81;
@@ -456,6 +508,7 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
 
           // Web Audio Sonification sync
           physicsAudio.updatePhysicsAudio(om, th, energy.total / 0.5);
+          setPhaseHistory((prev) => [...prev.slice(-80), { theta: th, omega: om }]);
 
           return {
             theta: th,
@@ -524,6 +577,7 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
 
           // Web Audio Sonification
           physicsAudio.updatePhysicsAudio(om2, th2, 0.7);
+          setPhaseHistory((prevP) => [...prevP.slice(-80), { theta: th1, omega: om1 }]);
 
           return {
             th1,
@@ -567,6 +621,19 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
             Math.min(1.0, Math.abs(st.u) / DEFAULT_CARTPOLE_PARAMS.maxForce)
           );
 
+          setPhaseHistory((prevP) => [...prevP.slice(-80), { theta: st.theta, omega: st.omega }]);
+
+          if (isKalmanActive) {
+            const measNoiseX = isNoiseActive ? (Math.random() - 0.5) * 0.04 : 0;
+            const measNoiseTh = isNoiseActive ? (Math.random() - 0.5) * 0.06 : 0;
+            const z: [number, number] = [st.x + measNoiseX, st.theta + measNoiseTh];
+
+            setKalmanState((prevK) => {
+              const pred = kalmanPredict(prevK, lqrModel.A, lqrModel.B, st.u, dt, DEFAULT_KALMAN_CONFIG);
+              return kalmanUpdate(pred, z, DEFAULT_KALMAN_CONFIG);
+            });
+          }
+
           return st;
         });
       }
@@ -590,7 +657,9 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
     fittedParameters,
     lqrModel,
     lqrTargetX,
-    lqrWindImpulse
+    lqrWindImpulse,
+    isKalmanActive,
+    isNoiseActive
   ]);
 
   // Determine current display angle for single pendulum
@@ -904,92 +973,298 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
         ctx.stroke();
       });
 
-      // 4. Inverted Pole / Rocket Booster Body
+      // 4. Inverted Pole / Rocket Booster / Gantry Crane / Robotic Joint
       const poleArmPx = Math.max(90, Math.min(180, lengthMeters * 120));
       const polePivotX = cartX;
-      const polePivotY = cartY - cartH / 2;
+      const polePivotY = archetype === 'gantry_crane' ? railY : cartY - cartH / 2;
 
       const tipX = polePivotX + poleArmPx * Math.sin(cartPoleState.theta);
-      const tipY = polePivotY - poleArmPx * Math.cos(cartPoleState.theta);
+      const tipY = archetype === 'gantry_crane'
+        ? polePivotY + poleArmPx * Math.cos(cartPoleState.theta)
+        : polePivotY - poleArmPx * Math.cos(cartPoleState.theta);
 
-      // Rocket Booster Fuselage
-      ctx.save();
-      ctx.translate(polePivotX, polePivotY);
-      ctx.rotate(cartPoleState.theta);
-
-      // Main rocket body cylinder
-      ctx.fillStyle = '#f8fafc';
-      ctx.strokeStyle = '#0284c7';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.roundRect(-5, -poleArmPx, 10, poleArmPx, [4, 4, 1, 1]);
-      ctx.fill();
-      ctx.stroke();
-
-      // Grid fins near top
-      ctx.fillStyle = '#475569';
-      ctx.fillRect(-11, -poleArmPx + 8, 22, 3);
-
-      // Thruster Nozzle at base
-      ctx.fillStyle = '#334155';
-      ctx.beginPath();
-      ctx.moveTo(-6, 0);
-      ctx.lineTo(6, 0);
-      ctx.lineTo(4, 8);
-      ctx.lineTo(-4, 8);
-      ctx.closePath();
-      ctx.fill();
-
-      // Active Gimbal Thruster Flame Plume (when |u| > 0.5N)
-      const forceMag = Math.abs(cartPoleState.u);
-      if (forceMag > 0.5) {
-        const flameLen = Math.min(35, 8 + forceMag * 1.2);
-        const flameGimbal = Math.max(-0.4, Math.min(0.4, -cartPoleState.u * 0.02));
-
+      if (archetype === 'gantry_crane') {
+        // HARBOR CRANE CONTAINER RENDERING
         ctx.save();
-        ctx.translate(0, 8);
-        ctx.rotate(flameGimbal);
-
-        // Core flame (white/cyan)
+        // Steel hoist dual cables
         ctx.beginPath();
-        ctx.moveTo(-3, 0);
-        ctx.lineTo(3, 0);
-        ctx.lineTo(0, flameLen);
+        ctx.moveTo(cartX - 12, railY);
+        ctx.lineTo(tipX - 18, tipY);
+        ctx.moveTo(cartX + 12, railY);
+        ctx.lineTo(tipX + 18, tipY);
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Suspended Intermodal Shipping Container
+        ctx.save();
+        ctx.translate(tipX, tipY);
+        ctx.rotate(cartPoleState.theta);
+
+        const cW = 54;
+        const cH = 28;
+        ctx.fillStyle = '#0369a1';
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(-cW / 2, 0, cW, cH, 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Hazard stripes on container edges
+        ctx.fillStyle = '#f59e0b';
+        ctx.fillRect(-cW / 2, 0, 6, cH);
+        ctx.fillRect(cW / 2 - 6, 0, 6, cH);
+
+        // Container label
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = 'bold 7px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('AETHER-ISO', 0, cH / 2 + 3);
+        ctx.restore();
+
+        // Anti-Sway trolley acceleration indicator
+        if (Math.abs(cartPoleState.u) > 0.5) {
+          const arrowDir = cartPoleState.u > 0 ? 1 : -1;
+          ctx.beginPath();
+          ctx.moveTo(cartX, railY - 18);
+          ctx.lineTo(cartX + arrowDir * 24, railY - 18);
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+        ctx.restore();
+      } else if (archetype === 'robotic_joint') {
+        // BIOMECHANICAL PROSTHETIC JOINT RENDERING
+        ctx.save();
+        ctx.translate(polePivotX, polePivotY);
+
+        // Stator motor housing
+        ctx.beginPath();
+        ctx.arc(0, 0, 14, 0, Math.PI * 2);
+        ctx.fillStyle = '#1e293b';
+        ctx.strokeStyle = '#a855f7';
+        ctx.lineWidth = 2;
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.rotate(cartPoleState.theta);
+
+        // Carbon fiber prosthetic shank / blade
+        ctx.fillStyle = '#0f172a';
+        ctx.strokeStyle = '#c084fc';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(-4, -poleArmPx, 8, poleArmPx, [2, 2, 6, 6]);
+        ctx.fill();
+        ctx.stroke();
+
+        // Blade foot / sensor end effector
+        ctx.beginPath();
+        ctx.arc(0, -poleArmPx, 8, 0, Math.PI * 2);
+        ctx.fillStyle = '#a855f7';
+        ctx.fill();
+
+        // Torque vector indicator arc
+        const torqueMag = Math.abs(cartPoleState.u);
+        if (torqueMag > 0.5) {
+          ctx.beginPath();
+          ctx.arc(0, 0, 22, -Math.PI / 4, Math.PI / 4, cartPoleState.u < 0);
+          ctx.strokeStyle = '#f43f5e';
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+        }
+        ctx.restore();
+      } else {
+        // ROCKET BOOSTER / CART-POLE FUSELAGE
+        ctx.save();
+        ctx.translate(polePivotX, polePivotY);
+        ctx.rotate(cartPoleState.theta);
+
+        // Main rocket body cylinder
+        ctx.fillStyle = '#f8fafc';
+        ctx.strokeStyle = '#0284c7';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(-5, -poleArmPx, 10, poleArmPx, [4, 4, 1, 1]);
+        ctx.fill();
+        ctx.stroke();
+
+        // Grid fins near top
+        ctx.fillStyle = '#475569';
+        ctx.fillRect(-11, -poleArmPx + 8, 22, 3);
+
+        // Thruster Nozzle at base
+        ctx.fillStyle = '#334155';
+        ctx.beginPath();
+        ctx.moveTo(-6, 0);
+        ctx.lineTo(6, 0);
+        ctx.lineTo(4, 8);
+        ctx.lineTo(-4, 8);
         ctx.closePath();
+        ctx.fill();
+
+        // Active Gimbal Thruster Flame Plume (when |u| > 0.5N)
+        const forceMag = Math.abs(cartPoleState.u);
+        if (forceMag > 0.5) {
+          const flameLen = Math.min(35, 8 + forceMag * 1.2);
+          const flameGimbal = Math.max(-0.4, Math.min(0.4, -cartPoleState.u * 0.02));
+
+          ctx.save();
+          ctx.translate(0, 8);
+          ctx.rotate(flameGimbal);
+
+          // Core flame (white/cyan)
+          ctx.beginPath();
+          ctx.moveTo(-3, 0);
+          ctx.lineTo(3, 0);
+          ctx.lineTo(0, flameLen);
+          ctx.closePath();
+          ctx.fillStyle = '#38bdf8';
+          ctx.fill();
+
+          // Outer glow (amber/orange)
+          ctx.beginPath();
+          ctx.moveTo(-5, 0);
+          ctx.lineTo(5, 0);
+          ctx.lineTo(0, flameLen * 1.3);
+          ctx.closePath();
+          ctx.fillStyle = 'rgba(249, 115, 22, 0.7)';
+          ctx.fill();
+
+          ctx.restore();
+        }
+
+        ctx.restore();
+
+        // Gimbal Base Joint
+        ctx.beginPath();
+        ctx.arc(polePivotX, polePivotY, 4, 0, 2 * Math.PI);
         ctx.fillStyle = '#38bdf8';
         ctx.fill();
 
-        // Outer glow (amber/orange)
+        // Tip Payload Sensor
         ctx.beginPath();
-        ctx.moveTo(-5, 0);
-        ctx.lineTo(5, 0);
-        ctx.lineTo(0, flameLen * 1.3);
-        ctx.closePath();
-        ctx.fillStyle = 'rgba(249, 115, 22, 0.7)';
+        ctx.arc(tipX, tipY, 6, 0, 2 * Math.PI);
+        ctx.fillStyle = '#10b981';
         ctx.fill();
-
-        ctx.restore();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
       }
 
-      ctx.restore();
+      // 5. Extended Kalman Filter & Sensor Noise Visualizer
+      if (isKalmanActive) {
+        const kHudX = width - 204;
+        const kHudY = 10;
+        ctx.fillStyle = 'rgba(6, 78, 59, 0.7)';
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(kHudX, kHudY, 194, 48, 4);
+        ctx.fill();
+        ctx.stroke();
 
-      // Gimbal Base Joint
-      ctx.beginPath();
-      ctx.arc(polePivotX, polePivotY, 4, 0, 2 * Math.PI);
-      ctx.fillStyle = '#38bdf8';
-      ctx.fill();
+        ctx.fillStyle = '#34d399';
+        ctx.font = 'bold 9px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText('EKF STATE OBSERVER ACTIVE', kHudX + 8, kHudY + 14);
 
-      // Tip Payload Sensor
-      ctx.beginPath();
-      ctx.arc(tipX, tipY, 6, 0, 2 * Math.PI);
-      ctx.fillStyle = '#10b981';
-      ctx.fill();
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1;
-      ctx.stroke();
+        ctx.fillStyle = '#a7f3d0';
+        ctx.font = '8px monospace';
+        ctx.fillText(
+          `x̂: ${kalmanState.xHat[0].toFixed(3)}m  θ̂: ${((kalmanState.xHat[2] * 180) / Math.PI).toFixed(2)}°`,
+          kHudX + 8,
+          kHudY + 28
+        );
+        ctx.fillText(
+          `Cov Tr(P): ${(kalmanState.P[0][0] + kalmanState.P[2][2]).toFixed(5)} (Stable)`,
+          kHudX + 8,
+          kHudY + 40
+        );
+
+        // If noisy measurement simulated, show raw optical marker vs filtered estimate
+        if (isNoiseActive) {
+          const noiseAngle = cartPoleState.theta + (kalmanState.residual[1] || 0.04);
+          const noiseTipX = polePivotX + poleArmPx * Math.sin(noiseAngle);
+          const noiseTipY = polePivotY - poleArmPx * Math.cos(noiseAngle);
+
+          // Raw noisy optical marker
+          ctx.beginPath();
+          ctx.arc(noiseTipX, noiseTipY, 4, 0, 2 * Math.PI);
+          ctx.fillStyle = '#f43f5e';
+          ctx.fill();
+
+          // Filtered EKF marker
+          const ekfTipX = polePivotX + poleArmPx * Math.sin(kalmanState.xHat[2]);
+          const ekfTipY = polePivotY - poleArmPx * Math.cos(kalmanState.xHat[2]);
+          ctx.beginPath();
+          ctx.arc(ekfTipX, ekfTipY, 5, 0, 2 * Math.PI);
+          ctx.strokeStyle = '#34d399';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+      }
+
+      // 6. Real-Time Phase Space Orbit Portrait
+      if (showPhasePortrait) {
+        const hudW = 124;
+        const hudH = 92;
+        const hudX = width - hudW - 10;
+        const hudY = height - hudH - 10;
+
+        ctx.fillStyle = 'rgba(10, 15, 26, 0.9)';
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(hudX, hudY, hudW, hudH, 6);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '8px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText('PHASE ORBIT [θ vs ω]', hudX + 8, hudY + 12);
+
+        const centerX = hudX + hudW / 2;
+        const centerY = hudY + hudH / 2 + 4;
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.2)';
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.moveTo(hudX + 6, centerY);
+        ctx.lineTo(hudX + hudW - 6, centerY);
+        ctx.moveTo(centerX, hudY + 16);
+        ctx.lineTo(centerX, hudY + hudH - 6);
+        ctx.stroke();
+
+        if (phaseHistory.length > 1) {
+          ctx.beginPath();
+          phaseHistory.forEach((pt, i) => {
+            const px = centerX + Math.max(-48, Math.min(48, pt.theta * 32));
+            const py = centerY - Math.max(-30, Math.min(30, pt.omega * 8));
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          });
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
+        }
+
+        // Current phase state dot
+        if (phaseHistory.length > 0) {
+          const lastPt = phaseHistory[phaseHistory.length - 1];
+          const px = centerX + Math.max(-48, Math.min(48, lastPt.theta * 32));
+          const py = centerY - Math.max(-30, Math.min(30, lastPt.omega * 8));
+          ctx.beginPath();
+          ctx.arc(px, py, 2.5, 0, 2 * Math.PI);
+          ctx.fillStyle = '#34d399';
+          ctx.fill();
+        }
+      }
     }
   }, [
     mechanism,
+    archetype,
     activeTheta,
     lengthMeters,
     doubleState,
@@ -997,7 +1272,12 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
     lqrTargetX,
     dragState.isDragging,
     dragState.target,
-    hoverTarget
+    hoverTarget,
+    isKalmanActive,
+    isNoiseActive,
+    showPhasePortrait,
+    kalmanState,
+    phaseHistory
   ]);
 
   // Energy Bar Gauges
@@ -1007,54 +1287,82 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
 
   return (
     <div className="flex flex-col h-full bg-graphite-900 border border-graphite-800/60 rounded-lg overflow-hidden">
-      {/* Titlebar with Mechanism Mode Toggle */}
-      <div className="flex items-center justify-between px-3.5 py-2 bg-[#0f1219] border-b border-graphite-800/60">
+      {/* Titlebar with Mechanism Mode & Cyber-Physical Archetypes */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between px-3 py-2 bg-[#0f1219] border-b border-graphite-800/60 gap-2">
         <div className="flex items-center gap-2">
           <Activity className="w-3.5 h-3.5 text-blue-400" />
           <span className="font-mono text-xs font-semibold text-graphite-100 tracking-tight">
-            DIGITAL TWIN SANDBOX
+            CYBER-PHYSICAL SANDBOX
           </span>
-          <ProvenanceBadge kind="CALCULATED" text="RK4 INTEGRATOR" />
+          <ProvenanceBadge kind="CALCULATED" text="LQR CARE SOLVER" />
         </div>
 
-        <div className="flex items-center gap-1 font-mono text-[10px]">
-          <button
-            onClick={() => setMechanism('single')}
-            className={`px-2 py-0.5 rounded transition ${
-              mechanism === 'single'
-                ? 'bg-blue-600 text-white font-semibold'
-                : 'text-graphite-400 hover:text-graphite-200 bg-graphite-800'
-            }`}
+        <div className="flex flex-wrap items-center gap-1.5 font-mono text-[10px]">
+          {/* Cyber-Physical Archetype Selector */}
+          <select
+            value={archetype}
+            onChange={(e) => handleSelectArchetype(e.target.value as TwinArchetypeId)}
+            className="bg-graphite-900 border border-graphite-750 text-slate-200 rounded px-2 py-0.5 text-[10px] font-mono focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm"
+            title="Select Cyber-Physical Industrial Archetype"
           >
-            1-DOF Planar
+            <option value="single_pendulum">🔬 Lab Single Twin (SAM 3.1)</option>
+            <option value="booster_tvc">🚀 Orbital Booster TVC</option>
+            <option value="gantry_crane">🏗️ Harbor Crane Anti-Sway</option>
+            <option value="robotic_joint">🦾 Prosthetic Knee Joint</option>
+            <option value="cart_pole">⚖️ Inverted Cart-Pole</option>
+            <option value="double_pendulum">🌀 Coupled Chaos Arm</option>
+          </select>
+
+          {/* Quick Disturbance Impulse Button */}
+          <button
+            onClick={handleInjectDisturbance}
+            className="px-2 py-0.5 rounded bg-amber-950/40 hover:bg-amber-900/40 text-amber-300 border border-amber-500/30 text-[10px] flex items-center gap-1 transition"
+            title="Inject physical disturbance impulse"
+          >
+            <Wind className="w-2.5 h-2.5 text-amber-400" />
+            <span className="hidden sm:inline">Disturbance</span>
           </button>
+
+          {/* EKF State Observer Toggle */}
           <button
-            onClick={() => {
-              setMechanism('double');
-              setIsSimRunning(true);
-            }}
-            className={`px-2 py-0.5 rounded transition flex items-center gap-1 ${
-              mechanism === 'double'
-                ? 'bg-purple-600 text-white font-semibold'
-                : 'text-graphite-400 hover:text-graphite-200 bg-graphite-800'
+            onClick={() => setIsKalmanActive(!isKalmanActive)}
+            className={`px-2 py-0.5 rounded text-[10px] flex items-center gap-1 transition border ${
+              isKalmanActive
+                ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/50 font-semibold'
+                : 'bg-graphite-850 text-graphite-400 border-graphite-750 hover:text-graphite-200'
             }`}
+            title="Toggle real-time Extended Kalman Filter state observer"
           >
-            <Flame className="w-2.5 h-2.5 text-amber-300" />
-            <span>2-DOF Chaos</span>
+            <Radio className="w-2.5 h-2.5 text-emerald-400" />
+            <span>EKF</span>
           </button>
+
+          {/* Simulated Sensor Noise Toggle */}
           <button
-            onClick={() => {
-              setMechanism('lqr');
-              setIsSimRunning(true);
-            }}
-            className={`px-2 py-0.5 rounded transition flex items-center gap-1 ${
-              mechanism === 'lqr'
-                ? 'bg-emerald-600 text-white font-semibold'
-                : 'text-graphite-400 hover:text-graphite-200 bg-graphite-800'
+            onClick={() => setIsNoiseActive(!isNoiseActive)}
+            className={`px-2 py-0.5 rounded text-[10px] flex items-center gap-1 transition border ${
+              isNoiseActive
+                ? 'bg-rose-950/60 text-rose-300 border-rose-500/50 font-semibold'
+                : 'bg-graphite-850 text-graphite-400 border-graphite-750 hover:text-graphite-200'
             }`}
+            title="Simulate optical camera noise / tracking jitter"
           >
-            <Navigation className="w-2.5 h-2.5 text-emerald-300" />
-            <span>Rocket LQR</span>
+            <Zap className="w-2.5 h-2.5 text-rose-400" />
+            <span className="hidden sm:inline">Noise</span>
+          </button>
+
+          {/* Phase Plane Orbit Toggle */}
+          <button
+            onClick={() => setShowPhasePortrait(!showPhasePortrait)}
+            className={`px-2 py-0.5 rounded text-[10px] flex items-center gap-1 transition border ${
+              showPhasePortrait
+                ? 'bg-cyan-950/60 text-cyan-300 border-cyan-500/50 font-semibold'
+                : 'bg-graphite-850 text-graphite-400 border-graphite-750 hover:text-graphite-200'
+            }`}
+            title="Toggle real-time Phase Plane orbit display [θ vs ω]"
+          >
+            <Orbit className="w-2.5 h-2.5 text-cyan-400" />
+            <span className="hidden sm:inline">Phase</span>
           </button>
         </div>
       </div>
