@@ -221,7 +221,7 @@ function Segmented({ items, value, onChange, label }: { items: string[]; value: 
 
 /* ---------------- A: revenue line ---------------- */
 
-function RevenueChart({ series, caption, prefix, colors, mono, tip }: { series: Point[]; caption?: string; prefix: string; colors: [string, string]; mono: string; tip: TipRef }) {
+function RevenueChart({ series, caption, prefix, colors, mono, tip, metricLabel }: { series: Point[]; caption?: string; prefix: string; colors: [string, string]; mono: string; tip: TipRef; metricLabel?: string }) {
   const [ref, { w: W, h: H }] = useSize();
   const reduce = useReducedMotion();
   const [drawn, setDrawn] = React.useState(false);
@@ -245,7 +245,7 @@ function RevenueChart({ series, caption, prefix, colors, mono, tip }: { series: 
     const r = (e.currentTarget as SVGRectElement).ownerSVGElement!.getBoundingClientRect();
     const i = Math.max(0, Math.min(vals.length - 1, Math.round(((e.clientX - r.left - 14) / (W - 66)) * (vals.length - 1))));
     setHover(i);
-    tip.current?.show(r.left + P[i][0], r.top + P[i][1], { title: series[i].label, rows: [{ label: "Revenue", value: prefix + fmt(vals[i]), color: colors[1] }] });
+    tip.current?.show(r.left + P[i][0], r.top + P[i][1], { title: series[i].label, rows: [{ label: metricLabel ?? caption ?? "Trajectory θ(t)", value: prefix + fmt(vals[i]), color: colors[1] }] });
   };
 
   return (
@@ -591,7 +591,7 @@ function VasnevBadge({ className = "" }: { className?: string }) {
 /* ---------------- the bento ---------------- */
 
 export function AnalyticsBento({
-  currency = "$",
+  currency = "",
   revenue,
   sessions,
   categories,
@@ -641,7 +641,7 @@ export function AnalyticsBento({
               </div>
               {revenue.note && <div className="mt-2 text-[13px] tracking-[-0.01em] text-muted-foreground/80">{revenue.note}</div>}
             </div>
-            <RevenueChart series={revenue.series} caption={revenue.caption} prefix={currency} colors={c.revenue as [string, string]} mono={monoFamily} tip={tip} />
+            <RevenueChart series={revenue.series} caption={revenue.caption} prefix={currency} colors={c.revenue as [string, string]} mono={monoFamily} tip={tip} metricLabel={revenue.label} />
           </div>
         </Card>
 

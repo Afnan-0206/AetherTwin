@@ -496,7 +496,12 @@ export default function Home() {
       {/* VIEW 1: Showcase Bento UI Demo */}
       {activeView === 'demo' && (
         <section className="flex-1 w-full bg-background panel-enter">
-          <AnalyticsBentoDemo />
+          <AnalyticsBentoDemo
+            metrics={metrics}
+            parameters={fittedParameters}
+            comparisonPoints={comparisonPoints}
+            activePresetId={activePresetId}
+          />
         </section>
       )}
 
