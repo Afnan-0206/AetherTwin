@@ -66,17 +66,50 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   const webcamStreamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
+  const webcamRequestIdRef = useRef<number>(0);
+  const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const recordTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     setTrackerMode(isDemoMode ? 'local' : 'sam');
   }, [isDemoMode]);
 
-  // Clean up camera stream on unmount or tab change
+  // Clean up camera stream, timers, and recorder on unmount or tab change
   const stopCameraStream = () => {
+    webcamRequestIdRef.current++;
+
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+      countdownTimerRef.current = null;
+    }
+
+    if (recordTimerRef.current) {
+      clearInterval(recordTimerRef.current);
+      recordTimerRef.current = null;
+    }
+
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.onstop = null;
+      mediaRecorderRef.current.ondataavailable = null;
+      if (mediaRecorderRef.current.state === 'recording') {
+        try {
+          mediaRecorderRef.current.stop();
+        } catch {
+          // Ignore interruption
+        }
+      }
+      mediaRecorderRef.current = null;
+    }
+
     if (webcamStreamRef.current) {
       webcamStreamRef.current.getTracks().forEach((track) => track.stop());
       webcamStreamRef.current = null;
     }
+
+    if (videoRef.current && videoRef.current.srcObject) {
+      videoRef.current.srcObject = null;
+    }
+
     setIsCameraActive(false);
     setIsRecording(false);
     setCountdown(null);
@@ -86,35 +119,57 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     if (!isOpen) {
       stopCameraStream();
     }
+    return () => {
+      stopCameraStream();
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;
 
   const startWebcam = async () => {
+    stopCameraStream();
+    const requestId = ++webcamRequestIdRef.current;
     setUploadError(null);
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 640 }, height: { ideal: 480 } },
         audio: false
       });
+
+      // If modal closed, tab changed, or subsequent request was issued while waiting
+      if (requestId !== webcamRequestIdRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+
       webcamStreamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        videoRef.current.play().catch(() => {});
       }
       setIsCameraActive(true);
     } catch (err: any) {
+      if (requestId !== webcamRequestIdRef.current) return;
       console.error('Camera error:', err);
       setUploadError('Camera access denied or unavailable. You can upload a recorded video file instead.');
     }
   };
 
   const handleStartCountdown = () => {
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+      countdownTimerRef.current = null;
+    }
+
     setCountdown(3);
-    const countTimer = setInterval(() => {
+    countdownTimerRef.current = setInterval(() => {
       setCountdown((prev) => {
         if (prev === null || prev <= 1) {
-          clearInterval(countTimer);
+          if (countdownTimerRef.current) {
+            clearInterval(countdownTimerRef.current);
+            countdownTimerRef.current = null;
+          }
           startRecordingWebcam();
           return null;
         }
@@ -161,10 +216,18 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       setIsRecording(true);
       setRecordingSecondsRemaining(4);
 
-      const recordTimer = setInterval(() => {
+      if (recordTimerRef.current) {
+        clearInterval(recordTimerRef.current);
+        recordTimerRef.current = null;
+      }
+
+      recordTimerRef.current = setInterval(() => {
         setRecordingSecondsRemaining((prev) => {
           if (prev <= 1) {
-            clearInterval(recordTimer);
+            if (recordTimerRef.current) {
+              clearInterval(recordTimerRef.current);
+              recordTimerRef.current = null;
+            }
             if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
               mediaRecorderRef.current.stop();
             }
@@ -289,6 +352,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             </button>
             <button
               onClick={() => {
+                if (videoPreviewUrl) {
+                  URL.revokeObjectURL(videoPreviewUrl);
+                  setVideoPreviewUrl(null);
+                }
+                setSelectedFile(null);
                 setInputTab('webcam');
                 startWebcam();
               }}

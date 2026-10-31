@@ -32,6 +32,7 @@ export interface ChaosHorizonResult {
   lyapunovHorizonSeconds: number; // Time when divergence exceeds 5.0 deg (0.087 rad)
   maxLyapunovExponent: number;
   isChaotic: boolean;
+  horizonReached: boolean; // Explicit flag indicating whether the 5.0 deg divergence threshold was crossed
 }
 
 /**
@@ -247,6 +248,8 @@ export function simulateDoublePendulumChaos(
     statesPerturbed,
     lyapunovHorizonSeconds,
     maxLyapunovExponent: Number(maxLyapunov.toFixed(2)),
-    isChaotic: maxLyapunov > 0.5
+    isChaotic: maxLyapunov > 0.5,
+    horizonReached: horizonDetected
   };
 }
+

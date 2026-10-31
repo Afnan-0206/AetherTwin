@@ -93,7 +93,21 @@ describe('Double Pendulum (2-DOF) Chaos & Lyapunov Dynamics', () => {
     // Perturbation of 1e-5 rad exponentially diverges in chaotic regime
     expect(result.maxLyapunovExponent).toBeGreaterThan(0.5);
     expect(result.isChaotic).toBe(true);
+    expect(result.horizonReached).toBe(true);
     // Lyapunov horizon should be reached before end of 6-second simulation
     expect(result.lyapunovHorizonSeconds).toBeLessThan(6.0);
+  });
+
+  it('identifies non-chaotic small amplitude regime where horizon is not reached within duration', () => {
+    const result = simulateDoublePendulumChaos(
+      0.05,
+      0.05,
+      { ...baseParams, damping1: 0.02, damping2: 0.02 },
+      6.0,
+      60
+    );
+
+    expect(result.horizonReached).toBe(false);
+    expect(result.isChaotic).toBe(false);
   });
 });

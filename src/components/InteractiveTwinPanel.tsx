@@ -25,6 +25,11 @@ interface InteractiveTwinPanelProps {
   onToggleSync: () => void;
 }
 
+// Shared geometry constants for 2-DOF Double Pendulum simulation and rendering
+const DOUBLE_PENDULUM_PIVOT_Y = 52;
+const DOUBLE_PENDULUM_ARM1_PX = 95;
+const DOUBLE_PENDULUM_ARM2_PX = 80;
+
 export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
   fittedParameters,
   videoSyncedAngleDeg,
@@ -250,11 +255,12 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
 
           const divRad = Math.hypot(th1 - th1B, th2 - th2B);
 
-          // Update trail of tip bob
-          const pivX = 310;
-          const pivY = 60;
-          const arm1Px = 95;
-          const arm2Px = 80;
+          // Update trail of tip bob using shared pivot and arm geometry
+          const canvasWidth = canvasRef.current?.width ?? 620;
+          const pivX = canvasWidth / 2;
+          const pivY = DOUBLE_PENDULUM_PIVOT_Y;
+          const arm1Px = DOUBLE_PENDULUM_ARM1_PX;
+          const arm2Px = DOUBLE_PENDULUM_ARM2_PX;
           const tipX = pivX + arm1Px * Math.sin(th1) + arm2Px * Math.sin(th2);
           const tipY = pivY + arm1Px * Math.cos(th1) + arm2Px * Math.cos(th2);
 
@@ -282,7 +288,10 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
     };
 
     animationFrameId = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(animationFrameId);
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      physicsAudio.mute();
+    };
   }, [isSyncedWithVideo, isSimRunning, gravity, lengthMeters, damping, mechanism, fittedParameters]);
 
   // Determine current display angle for single pendulum
@@ -305,7 +314,7 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
     ctx.fillRect(0, 0, width, height);
 
     const pivotX = width / 2;
-    const pivotY = 52;
+    const pivotY = DOUBLE_PENDULUM_PIVOT_Y;
 
     if (mechanism === 'single') {
       const armPx = Math.max(110, Math.min(220, 130 + lengthMeters * 50));
@@ -398,8 +407,8 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
       ctx.stroke();
     } else {
       // DOUBLE PENDULUM RENDERING
-      const arm1Px = 95;
-      const arm2Px = 80;
+      const arm1Px = DOUBLE_PENDULUM_ARM1_PX;
+      const arm2Px = DOUBLE_PENDULUM_ARM2_PX;
 
       const j1X = pivotX + arm1Px * Math.sin(doubleState.th1);
       const j1Y = pivotY + arm1Px * Math.cos(doubleState.th1);

@@ -79,8 +79,19 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
     if (comparisonPoints.length < 8) return null;
     const meas = comparisonPoints.map((p) => p.measuredAngleDeg);
     const pred = comparisonPoints.map((p) => p.predictedAngleDeg);
-    return computeSpectralAnalysis(meas, pred, 30);
-  }, [comparisonPoints]);
+
+    const duration =
+      comparisonPoints[comparisonPoints.length - 1].timestamp - comparisonPoints[0].timestamp;
+    const rateFromTimestamps = duration > 0 ? (comparisonPoints.length - 1) / duration : 0;
+    const samplingFps =
+      rateFromTimestamps > 0
+        ? rateFromTimestamps
+        : calibration?.videoFps && calibration.videoFps > 0
+        ? calibration.videoFps
+        : 30;
+
+    return computeSpectralAnalysis(meas, pred, samplingFps);
+  }, [comparisonPoints, calibration?.videoFps]);
 
   // Compute Double Pendulum Chaos & Lyapunov Horizon
   const chaosResult = useMemo(() => {
@@ -985,7 +996,10 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
                 </span>
               </div>
               <span className="text-purple-300 font-semibold">
-                Horizon: {chaosResult.lyapunovHorizonSeconds}s
+                Horizon:{' '}
+                {!chaosResult.horizonReached && !chaosResult.isChaotic
+                  ? 'not reached within 6 s'
+                  : `${chaosResult.lyapunovHorizonSeconds}s`}
               </span>
             </div>
 
@@ -1010,13 +1024,15 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
                   return (
                     <>
                       {/* Chaos Zone Shading */}
-                      <rect
-                        x={horizonX}
-                        y={padTop}
-                        width={padLeft + plotW - horizonX}
-                        height={plotH}
-                        fill="rgba(168, 85, 247, 0.08)"
-                      />
+                      {chaosResult.horizonReached && (
+                        <rect
+                          x={horizonX}
+                          y={padTop}
+                          width={padLeft + plotW - horizonX}
+                          height={plotH}
+                          fill="rgba(168, 85, 247, 0.08)"
+                        />
+                      )}
 
                       {/* 5-degree divergence threshold line */}
                       <line
@@ -1039,25 +1055,29 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
                       </text>
 
                       {/* Lyapunov Horizon Marker */}
-                      <line
-                        x1={horizonX}
-                        y1={padTop}
-                        x2={horizonX}
-                        y2={padTop + plotH}
-                        stroke="#a855f7"
-                        strokeWidth="1.8"
-                        strokeDasharray="2,2"
-                      />
-                      <text
-                        x={horizonX + 4}
-                        y={padTop + 14}
-                        fill="#c084fc"
-                        fontSize="8"
-                        fontFamily="monospace"
-                        fontWeight="bold"
-                      >
-                        LYAPUNOV HORIZON ({chaosResult.lyapunovHorizonSeconds}s)
-                      </text>
+                      {chaosResult.horizonReached && (
+                        <>
+                          <line
+                            x1={horizonX}
+                            y1={padTop}
+                            x2={horizonX}
+                            y2={padTop + plotH}
+                            stroke="#a855f7"
+                            strokeWidth="1.8"
+                            strokeDasharray="2,2"
+                          />
+                          <text
+                            x={Math.min(padLeft + plotW - 115, horizonX + 4)}
+                            y={padTop + 14}
+                            fill="#c084fc"
+                            fontSize="8"
+                            fontFamily="monospace"
+                            fontWeight="bold"
+                          >
+                            LYAPUNOV HORIZON ({chaosResult.lyapunovHorizonSeconds}s)
+                          </text>
+                        </>
+                      )}
 
                       {/* Divergence Curve */}
                       <path
@@ -1073,7 +1093,13 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
             </div>
 
             <div className="p-2.5 rounded bg-purple-950/20 border border-purple-500/20 text-[10px] text-purple-200/90 leading-relaxed">
-              <strong>The Mathematical Horizon of Digital Twins:</strong> With a microscopic perturbation (&delta;₀ = 10⁻⁵ rad), the deterministic twin stays faithful until <span className="text-amber-300 font-bold">{chaosResult.lyapunovHorizonSeconds}s</span>, after which sensitive dependence on initial conditions produces exponential divergence (|&Delta;&theta;| ~ e^({chaosResult.maxLyapunovExponent}·t)).
+              <strong>The Mathematical Horizon of Digital Twins:</strong> With a microscopic perturbation (&delta;₀ = 10⁻⁵ rad), the deterministic twin stays faithful until{' '}
+              <span className="text-amber-300 font-bold">
+                {!chaosResult.horizonReached && !chaosResult.isChaotic
+                  ? 'not reached within 6 s'
+                  : `${chaosResult.lyapunovHorizonSeconds}s`}
+              </span>
+              , after which sensitive dependence on initial conditions produces exponential divergence (|&Delta;&theta;| ~ e^({chaosResult.maxLyapunovExponent}·t)).
             </div>
           </div>
         )}

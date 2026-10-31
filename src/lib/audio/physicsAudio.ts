@@ -125,11 +125,23 @@ class PhysicsAudioEngine {
     }
   }
 
-  public stop() {
+  /**
+   * Mutes current audio output while preserving isEnabled user configuration
+   */
+  public mute() {
     if (this.gainNode && this.ctx) {
       this.gainNode.gain.setValueAtTime(0, this.ctx.currentTime);
     }
   }
+
+  /**
+   * Stops audio and disables the engine
+   */
+  public stop() {
+    this.isEnabled = false;
+    this.mute();
+  }
 }
 
 export const physicsAudio = new PhysicsAudioEngine();
+
