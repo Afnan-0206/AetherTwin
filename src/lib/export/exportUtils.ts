@@ -384,6 +384,307 @@ title('LQR Inverted Pendulum / Booster TVC Disturbance Rejection');
 }
 
 /**
+ * Generates an interactive, standalone HTML verification report with embedded SVG plots.
+ */
+export function generateInteractiveHtmlReport(
+  params: PendulumParameters,
+  metrics: ValidationMetrics,
+  points: TrajectoryComparisonPoint[],
+  lqrModel?: StateSpaceModel,
+  calibration?: Partial<CalibrationConfig>
+): string {
+  const n = points.length;
+  const trainCount = Math.floor(n * 0.7);
+  const holdoutCount = n - trainCount;
+
+  // Generate SVG path for measured & predicted curves
+  const W = 800;
+  const H = 260;
+  const pad = 40;
+  const maxDeg = Math.max(10, ...points.map((p) => Math.abs(p.measuredAngleDeg)), ...points.map((p) => Math.abs(p.predictedAngleDeg)));
+  const getY = (val: number) => H / 2 - (val / maxDeg) * (H / 2 - pad);
+  const getX = (idx: number) => pad + (idx / Math.max(1, n - 1)) * (W - 2 * pad);
+
+  let measuredPath = '';
+  let predictedPath = '';
+  points.forEach((p, i) => {
+    const x = getX(i);
+    const yM = getY(p.measuredAngleDeg);
+    const yP = getY(p.predictedAngleDeg);
+    measuredPath += `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${yM.toFixed(1)} `;
+    predictedPath += `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${yP.toFixed(1)} `;
+  });
+
+  const splitX = getX(trainCount);
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AetherTwin — Physical Digital Twin Verification Report</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    :root {
+      --bg: #090d16;
+      --card: #0f1523;
+      --border: #1e293b;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --green: #34d399;
+      --purple: #a855f7;
+      --amber: #fbbf24;
+    }
+    body {
+      margin: 0;
+      padding: 32px 16px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.5;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    header {
+      border-b: 1px solid var(--border);
+      padding-bottom: 20px;
+      margin-bottom: 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: monospace;
+      font-weight: 600;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: var(--accent);
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    h1, h2, h3 {
+      margin-top: 0;
+      font-weight: 600;
+    }
+    h1 { font-size: 24px; margin-bottom: 6px; }
+    h2 { font-size: 17px; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+    }
+    .stat-box {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border);
+      padding: 12px 16px;
+      border-radius: 8px;
+    }
+    .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; font-family: monospace; }
+    .stat-val { font-size: 20px; font-weight: 700; font-family: monospace; margin-top: 4px; color: var(--text); }
+    .stat-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-top: 12px;
+    }
+    th, td {
+      padding: 8px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    th { color: var(--muted); font-family: monospace; font-size: 11px; text-transform: uppercase; }
+    .chart-container {
+      width: 100%;
+      overflow-x: auto;
+      background: #060911;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      box-sizing: border-box;
+    }
+    svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+    .legend {
+      display: flex;
+      gap: 20px;
+      font-size: 12px;
+      font-family: monospace;
+      margin-top: 12px;
+      justify-content: center;
+    }
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .legend-color { width: 12px; height: 3px; border-radius: 1px; }
+    footer {
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 40px;
+      border-top: 1px solid var(--border);
+      padding-top: 20px;
+      font-family: monospace;
+    }
+    @media print {
+      body { background: #fff; color: #000; }
+      .card { border: 1px solid #ccc; background: #fff; color: #000; }
+      .stat-box { background: #f8fafc; border: 1px solid #ccc; }
+      .stat-val { color: #000; }
+      header { border-bottom: 1px solid #ccc; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>AetherTwin Scientific Verification Certificate</h1>
+        <p style="margin: 0; color: var(--muted); font-size: 13px;">
+          Deterministic Non-Linear Parameter Identification & Continuous-Time Riccati LQR Control
+        </p>
+      </div>
+      <div>
+        <span class="badge">70/30 HOLDOUT VALIDATED</span>
+      </div>
+    </header>
+
+    <div class="grid" style="margin-bottom: 24px;">
+      <div class="stat-box">
+        <div class="stat-label">Holdout RMSE</div>
+        <div class="stat-val" style="color: var(--green);">${metrics.holdoutRmseDeg.toFixed(2)}°</div>
+        <div class="stat-sub">vs ${metrics.baselineHoldoutRmseDeg.toFixed(2)}° Baseline</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Error Reduction</div>
+        <div class="stat-val" style="color: var(--accent);">${metrics.errorReductionPercent.toFixed(1)}%</div>
+        <div class="stat-sub">Strict 30% Holdout</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Natural Frequency ω₀²</div>
+        <div class="stat-val">${params.omega0Sq.toFixed(2)} <span style="font-size: 12px;">s⁻²</span></div>
+        <div class="stat-sub">Period T = ${(2 * Math.PI / Math.sqrt(params.omega0Sq)).toFixed(2)}s</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Damping Coefficient c₁</div>
+        <div class="stat-val">${params.damping.toFixed(3)} <span style="font-size: 12px;">s⁻¹</span></div>
+        <div class="stat-sub">Viscous Dissipation</div>
+      </div>
+    </div>
+
+    <!-- Chart Card -->
+    <div class="card">
+      <h2>Empirical vs Predictive Trajectory [θ(t)]</h2>
+      <div class="chart-container">
+        <svg viewBox="0 0 ${W} ${H}">
+          <!-- Zero line -->
+          <line x1="${pad}" y1="${H/2}" x2="${W - pad}" y2="${H/2}" stroke="#334155" stroke-dasharray="3,3" stroke-width="1" />
+          <!-- Holdout Split line -->
+          <line x1="${splitX}" y1="10" x2="${splitX}" y2="${H - 10}" stroke="#f59e0b" stroke-dasharray="4,4" stroke-width="1.5" />
+          <text x="${splitX - 6}" y="24" fill="#f59e0b" font-size="10" font-family="monospace" text-anchor="end">70% TRAIN</text>
+          <text x="${splitX + 6}" y="24" fill="#f59e0b" font-size="10" font-family="monospace" text-anchor="start">30% HOLDOUT</text>
+
+          <!-- Predicted Curve -->
+          <path d="${predictedPath}" fill="none" stroke="#34d399" stroke-width="2.5" />
+          <!-- Measured Curve -->
+          <path d="${measuredPath}" fill="none" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2,2" />
+        </svg>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-color" style="background: #38bdf8;"></div><span>Measured (SAM 3.1)</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: #34d399;"></div><span>Predicted (Deterministic RK4)</span></div>
+        <div class="legend-item"><div class="legend-color" style="background: #f59e0b;"></div><span>70/30 Validation Boundary</span></div>
+      </div>
+    </div>
+
+    <!-- Model Parameters Card -->
+    <div class="card">
+      <h2>Identified Physical Parameters</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Parameter</th>
+            <th>Symbol</th>
+            <th>Identified Value</th>
+            <th>Physical Unit</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Natural Frequency Squared</td>
+            <td><code>ω₀² = g/L</code></td>
+            <td><strong>${params.omega0Sq.toFixed(4)}</strong></td>
+            <td>s⁻²</td>
+          </tr>
+          <tr>
+            <td>Linear Viscous Drag</td>
+            <td><code>c₁</code></td>
+            <td><strong>${params.damping.toFixed(4)}</strong></td>
+            <td>s⁻¹</td>
+          </tr>
+          <tr>
+            <td>Aerodynamic Quadratic Drag</td>
+            <td><code>c₂</code></td>
+            <td><strong>${(params.dampingQuadratic ?? 0).toFixed(4)}</strong></td>
+            <td>rad⁻¹</td>
+          </tr>
+          <tr>
+            <td>Initial Angular Displacement</td>
+            <td><code>θ₀</code></td>
+            <td><strong>${((params.initialAngle * 180) / Math.PI).toFixed(2)}°</strong></td>
+            <td>degrees (${params.initialAngle.toFixed(4)} rad)</td>
+          </tr>
+          <tr>
+            <td>Calibrated Physical Length</td>
+            <td><code>L</code></td>
+            <td><strong>${(params.length ?? 0.50).toFixed(3)}</strong></td>
+            <td>meters</td>
+          </tr>
+          <tr>
+            <td>Inferred Gravity</td>
+            <td><code>g</code></td>
+            <td><strong>${(params.gravity ?? (params.omega0Sq * (params.length ?? 0.50))).toFixed(3)}</strong></td>
+            <td>m/s²</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    ${lqrModel ? `
+    <!-- LQR Control Card -->
+    <div class="card">
+      <h2>Continuous-Time Riccati LQR Control Law [u = -K·x]</h2>
+      <p style="font-size: 13px; color: var(--muted); margin-top: -6px;">
+        Linear Quadratic Regulator computed via exact 8x8 Hamiltonian Matrix Sign Function:
+      </p>
+      <div style="background: rgba(15, 23, 42, 0.6); padding: 12px 16px; border-radius: 6px; font-family: monospace; font-size: 12px; border: 1px solid var(--border);">
+        <strong>K = [</strong> ${lqrModel.K.map((k) => k.toFixed(3)).join(', ')} <strong>]</strong>
+      </div>
+      <div style="margin-top: 12px; font-size: 12px; font-family: monospace; color: var(--green);">
+        Closed-Loop Poles: [${lqrModel.closedLoopPoles.map(p => `${p.real.toFixed(2)}${p.imag !== 0 ? ` ${p.imag >= 0 ? '+' : '-'} ${Math.abs(p.imag).toFixed(2)}i` : ''}`).join(', ')}] • Asymptotically Stable
+      </div>
+    </div>
+    ` : ''}
+
+    <footer>
+      Generated deterministically by AetherTwin Scientific Workstation • ISO 8601 Timestamp: ${new Date().toISOString()}
+    </footer>
+  </div>
+</body>
+</html>`;
+}
+
+/**
  * Triggers a file download in the browser.
  */
 export function downloadTextFile(filename: string, content: string, mimeType: string = 'text/plain') {

@@ -5,7 +5,8 @@ import {
   generateVerificationCertificateMarkdown,
   generateRos2NodeScript,
   generateArduinoCppFirmware,
-  generateMatlabSimulinkScript
+  generateMatlabSimulinkScript,
+  generateInteractiveHtmlReport
 } from '../lib/export/exportUtils';
 import { linearizeCartPole, DEFAULT_CARTPOLE_PARAMS } from '../lib/physics/cartPoleLqr';
 import { TrajectoryComparisonPoint, PendulumParameters, ValidationMetrics, ProvenanceLogEntry } from '../lib/types';
@@ -131,6 +132,24 @@ describe('Export & Verification Utilities', () => {
     expect(m).toContain('sys_ol = ss(A, B, C, D)');
     expect(m).toContain('lqr(A, B, Q, R)');
     expect(m).toContain('sys_cl = ss(A - B*K, B, C, D)');
+  });
+
+  it('generates standalone interactive HTML verification report with embedded SVG and metrics', () => {
+    const lqrModel = linearizeCartPole(DEFAULT_CARTPOLE_PARAMS);
+    const mockCalib = {
+      pivot: { x: 320, y: 70 },
+      knownLengthMeters: 0.50,
+      scalePixelsPerMeter: 500,
+      videoFps: 30
+    };
+    const html = generateInteractiveHtmlReport(mockParams, mockMetrics, mockPoints, lqrModel, mockCalib);
+    expect(html).toContain('<!DOCTYPE html>');
+    expect(html).toContain('AetherTwin Scientific Verification Certificate');
+    expect(html).toContain('70% TRAIN');
+    expect(html).toContain('30% HOLDOUT');
+    expect(html).toContain('Continuous-Time Riccati LQR Control Law');
+    expect(html).toContain('97.4%');
+    expect(html).toContain('<svg');
   });
 });
 

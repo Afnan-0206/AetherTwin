@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Upload,
   X,
@@ -32,17 +32,20 @@ interface UploadModalProps {
     useLocalTracker?: boolean;
   }) => void;
   isDemoMode: boolean;
+  initialFile?: File | null;
 }
 
 export const UploadModal: React.FC<UploadModalProps> = ({
   isOpen,
   onClose,
   onProcessVideo,
-  isDemoMode
+  isDemoMode,
+  initialFile
 }) => {
   const [inputTab, setInputTab] = useState<'upload' | 'webcam'>('upload');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
+  const [isDropZoneOver, setIsDropZoneOver] = useState<boolean>(false);
   const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: number }>({
     width: 640,
     height: 480
@@ -123,8 +126,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       stopCameraStream();
     };
   }, [isOpen]);
-
-  if (!isOpen) return null;
 
   const startWebcam = async () => {
     stopCameraStream();
@@ -241,13 +242,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const loadVideoFile = useCallback((file: File) => {
     setUploadError(null);
-    const file = e.target.files?.[0];
-    if (!file) return;
-
     if (!file.type.includes('mp4') && !file.type.includes('quicktime') && !file.type.includes('video/')) {
-      setUploadError('Invalid format. Please upload an MP4 or MOV video file.');
+      setUploadError('Invalid format. Please upload an MP4, WEBM, or MOV video file.');
       return;
     }
 
@@ -256,9 +254,27 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       return;
     }
 
+    setVideoPreviewUrl((prev) => {
+      if (prev) {
+        URL.revokeObjectURL(prev);
+      }
+      return URL.createObjectURL(file);
+    });
     setSelectedFile(file);
-    const url = URL.createObjectURL(file);
-    setVideoPreviewUrl(url);
+    setInputTab('upload');
+  }, []);
+
+  useEffect(() => {
+    if (isOpen && initialFile) {
+      loadVideoFile(initialFile);
+    }
+  }, [isOpen, initialFile, loadVideoFile]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      loadVideoFile(file);
+    }
   };
 
   const handleLoadedMetadata = () => {
@@ -313,6 +329,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     stopCameraStream();
     onClose();
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto">
@@ -399,7 +417,32 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         <div className="py-3.5 space-y-3.5 font-mono text-xs">
           {/* TAB 1: FILE PICKER */}
           {inputTab === 'upload' && !videoPreviewUrl && (
-            <div className="border border-dashed border-graphite-700 hover:border-blue-500 rounded-lg p-8 text-center transition cursor-pointer bg-graphite-950/60">
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDropZoneOver(true);
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDropZoneOver(false);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDropZoneOver(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file) {
+                  loadVideoFile(file);
+                }
+              }}
+              className={`border border-dashed rounded-lg p-8 text-center transition cursor-pointer ${
+                isDropZoneOver
+                  ? 'border-blue-400 bg-blue-950/40 ring-2 ring-blue-500/40'
+                  : 'border-graphite-700 hover:border-blue-500 bg-graphite-950/60'
+              }`}
+            >
               <input
                 type="file"
                 accept="video/mp4,video/quicktime,video/*"
@@ -411,9 +454,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                 htmlFor="video-upload-input"
                 className="cursor-pointer flex flex-col items-center"
               >
-                <Video className="w-8 h-8 text-blue-400 mb-2" />
+                <Video className={`w-8 h-8 mb-2 transition-transform ${isDropZoneOver ? 'text-blue-300 scale-110' : 'text-blue-400'}`} />
                 <span className="text-xs font-semibold text-graphite-200">
-                  Select a pendulum video recording (MP4 or MOV)
+                  {isDropZoneOver ? 'Drop pendulum video now' : 'Select or drag & drop a pendulum video (MP4 or MOV)'}
                 </span>
                 <span className="text-[10px] text-graphite-500 mt-1">
                   2-8 seconds recommended • Planar swing • Max 35MB

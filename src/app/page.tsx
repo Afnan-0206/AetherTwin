@@ -9,6 +9,7 @@ import { MetricsDiagnosticsPanel } from '@/components/MetricsDiagnosticsPanel';
 import { CalibrationModal } from '@/components/CalibrationModal';
 import { UploadModal } from '@/components/UploadModal';
 import { HelpModal } from '@/components/HelpModal';
+import { GuidedTourModal } from '@/components/GuidedTourModal';
 import { PhysicsTelemetryBento } from '@/components/ui/physics-telemetry-bento';
 import AnalyticsBentoDemo from '@/components/ui/demo';
 import {
@@ -31,7 +32,7 @@ import {
 import { fitDampedPendulum } from '@/lib/physics/parameterFitter';
 import { trackVideoInBrowser } from '@/lib/cv/opticalTracker';
 import { physicsAudio } from '@/lib/audio/physicsAudio';
-import { Play, Upload, Activity, ShieldCheck, ChevronRight, Layers, Compass, Zap, Cpu } from 'lucide-react';
+import { Play, Upload, Activity, ShieldCheck, ChevronRight, Layers, Compass, Zap, Cpu, Sparkles } from 'lucide-react';
 
 export default function Home() {
   // Analytical state
@@ -81,7 +82,50 @@ export default function Home() {
   const [isCalibrationOpen, setIsCalibrationOpen] = useState<boolean>(false);
   const [isUploadOpen, setIsUploadOpen] = useState<boolean>(false);
   const [isHelpOpen, setIsHelpOpen] = useState<boolean>(false);
+  const [isTourOpen, setIsTourOpen] = useState<boolean>(false);
   const [isDemoMode, setIsDemoMode] = useState<boolean>(true);
+  const [isDraggingFile, setIsDraggingFile] = useState<boolean>(false);
+  const [droppedFile, setDroppedFile] = useState<File | null>(null);
+
+  // Global Drag & Drop video handler
+  useEffect(() => {
+    const handleWindowDragOver = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')) {
+        setIsDraggingFile(true);
+      }
+    };
+
+    const handleWindowDragLeave = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.clientX <= 0 || e.clientY <= 0 || e.clientX >= window.innerWidth || e.clientY >= window.innerHeight) {
+        setIsDraggingFile(false);
+      }
+    };
+
+    const handleWindowDrop = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDraggingFile(false);
+      const file = e.dataTransfer?.files?.[0];
+      if (file && (file.type.includes('video/') || file.type.includes('mp4') || file.type.includes('quicktime'))) {
+        setDroppedFile(file);
+        setIsUploadOpen(true);
+      }
+    };
+
+    window.addEventListener('dragover', handleWindowDragOver);
+    window.addEventListener('dragleave', handleWindowDragLeave);
+    window.addEventListener('drop', handleWindowDrop);
+
+    return () => {
+      window.removeEventListener('dragover', handleWindowDragOver);
+      window.removeEventListener('dragleave', handleWindowDragLeave);
+      window.removeEventListener('drop', handleWindowDrop);
+    };
+  }, []);
 
   // Check if API key is configured on server on mount
   useEffect(() => {
@@ -478,6 +522,7 @@ export default function Home() {
         onReset={handleReset}
         onOpenHelp={() => setIsHelpOpen(true)}
         onOpenCalibration={() => setIsCalibrationOpen(true)}
+        onOpenTour={() => setIsTourOpen(true)}
         isProcessing={['segmenting', 'measuring', 'fitting', 'validating', 'diagnosing'].includes(stage)}
         hasData={measurements.length > 0}
         isDemoMode={isDemoMode}
@@ -606,7 +651,7 @@ export default function Home() {
             </div>
 
             {/* Action buttons */}
-            <div className="flex items-center justify-center gap-3">
+            <div className="flex flex-wrap items-center justify-center gap-3">
               <button
                 onClick={() => handleRunSampleAnalysis(activePresetId)}
                 className="focus-ring px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-mono font-medium text-sm transition-all flex items-center gap-2.5 shadow-lg shadow-blue-900/20"
@@ -622,6 +667,14 @@ export default function Home() {
               >
                 <Upload className="w-4 h-4 text-graphite-400" />
                 <span>Upload Custom Clip</span>
+              </button>
+
+              <button
+                onClick={() => setIsTourOpen(true)}
+                className="focus-ring px-4 py-2.5 rounded-lg bg-blue-950/40 hover:bg-blue-900/40 text-blue-300 border border-blue-500/30 font-mono text-sm transition-all flex items-center gap-2"
+              >
+                <Sparkles className="w-4 h-4 text-blue-400" />
+                <span>Guided Tour</span>
               </button>
             </div>
 
@@ -706,15 +759,41 @@ export default function Home() {
 
       <UploadModal
         isOpen={isUploadOpen}
-        onClose={() => setIsUploadOpen(false)}
+        onClose={() => {
+          setIsUploadOpen(false);
+          setDroppedFile(null);
+        }}
         onProcessVideo={handleProcessCustomVideo}
         isDemoMode={isDemoMode}
+        initialFile={droppedFile}
+      />
+
+      <GuidedTourModal
+        isOpen={isTourOpen}
+        onClose={() => setIsTourOpen(false)}
+        onRunBenchmark={(presetId) => {
+          setActivePresetId(presetId);
+          handleRunSampleAnalysis(presetId);
+        }}
       />
 
       <HelpModal
         isOpen={isHelpOpen}
         onClose={() => setIsHelpOpen(false)}
       />
+
+      {/* Global Drag-and-Drop Ingest Overlay */}
+      {isDraggingFile && (
+        <div className="fixed inset-0 z-50 bg-blue-950/80 backdrop-blur-md border-4 border-dashed border-blue-400 flex flex-col items-center justify-center pointer-events-none transition-all">
+          <div className="p-8 rounded-2xl bg-[#0a0e17] border border-blue-500/40 shadow-2xl flex flex-col items-center text-center animate-pulse">
+            <Upload className="w-12 h-12 text-blue-400 mb-3 animate-bounce" />
+            <h3 className="font-mono text-lg font-bold text-slate-100">Drop Pendulum Video File</h3>
+            <p className="font-mono text-xs text-graphite-400 mt-1 max-w-sm">
+              Instant Ingest into Meta SAM 3.1 & Circle-Fit Optical Geometry Calibration
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="border-t border-graphite-800/50 bg-[#090c13] px-4 lg:px-6 py-2.5 text-graphite-500 font-mono text-[10px] flex flex-col sm:flex-row items-center justify-between gap-2">

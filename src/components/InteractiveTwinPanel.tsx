@@ -123,6 +123,218 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
 
   const [isSimRunning, setIsSimRunning] = useState<boolean>(!isSyncedWithVideo);
 
+  // Interactive direct manipulation dragging state
+  const [dragState, setDragState] = useState<{
+    isDragging: boolean;
+    target: 'single_bob' | 'double_bob1' | 'double_bob2' | 'lqr_cart' | 'lqr_pole' | null;
+    history: { x: number; y: number; t: number }[];
+  }>({
+    isDragging: false,
+    target: null,
+    history: []
+  });
+  const [hoverTarget, setHoverTarget] = useState<string | null>(null);
+  const [hasInteracted, setHasInteracted] = useState<boolean>(false);
+
+  // Coordinate helper
+  const getCanvasCoords = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY
+    };
+  }, []);
+
+  // Pointer Down: Start Dragging
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const coords = getCanvasCoords(e);
+    const pivotX = canvas.width / 2;
+    const pivotY = DOUBLE_PENDULUM_PIVOT_Y;
+
+    if (mechanism === 'single') {
+      const armPx = Math.max(110, Math.min(220, 130 + lengthMeters * 50));
+      const bobX = pivotX + armPx * Math.sin(activeTheta);
+      const bobY = pivotY + armPx * Math.cos(activeTheta);
+      const dist = Math.hypot(coords.x - bobX, coords.y - bobY);
+
+      if (dist <= 36) {
+        setHasInteracted(true);
+        try {
+          (e.target as HTMLElement).setPointerCapture(e.pointerId);
+        } catch {}
+        setDragState({
+          isDragging: true,
+          target: 'single_bob',
+          history: [{ x: coords.x, y: coords.y, t: performance.now() }]
+        });
+        if (isSyncedWithVideo) {
+          onToggleSync();
+        }
+      }
+    } else if (mechanism === 'double') {
+      const b1X = pivotX + DOUBLE_PENDULUM_ARM1_PX * Math.sin(doubleState.th1);
+      const b1Y = pivotY + DOUBLE_PENDULUM_ARM1_PX * Math.cos(doubleState.th1);
+      const b2X = b1X + DOUBLE_PENDULUM_ARM2_PX * Math.sin(doubleState.th2);
+      const b2Y = b1Y + DOUBLE_PENDULUM_ARM2_PX * Math.cos(doubleState.th2);
+
+      if (Math.hypot(coords.x - b2X, coords.y - b2Y) <= 30) {
+        setHasInteracted(true);
+        try { (e.target as HTMLElement).setPointerCapture(e.pointerId); } catch {}
+        setDragState({
+          isDragging: true,
+          target: 'double_bob2',
+          history: [{ x: coords.x, y: coords.y, t: performance.now() }]
+        });
+      } else if (Math.hypot(coords.x - b1X, coords.y - b1Y) <= 30) {
+        setHasInteracted(true);
+        try { (e.target as HTMLElement).setPointerCapture(e.pointerId); } catch {}
+        setDragState({
+          isDragging: true,
+          target: 'double_bob1',
+          history: [{ x: coords.x, y: coords.y, t: performance.now() }]
+        });
+      }
+    } else if (mechanism === 'lqr') {
+      const cartX = pivotX + cartPoleState.x * 120;
+      const groundY = 250;
+      const polePx = 110;
+      const tipX = cartX + polePx * Math.sin(cartPoleState.theta);
+      const tipY = groundY - polePx * Math.cos(cartPoleState.theta);
+
+      if (Math.hypot(coords.x - tipX, coords.y - tipY) <= 32) {
+        setHasInteracted(true);
+        try { (e.target as HTMLElement).setPointerCapture(e.pointerId); } catch {}
+        setDragState({
+          isDragging: true,
+          target: 'lqr_pole',
+          history: [{ x: coords.x, y: coords.y, t: performance.now() }]
+        });
+      } else if (Math.abs(coords.x - cartX) <= 40 && Math.abs(coords.y - groundY) <= 25) {
+        setHasInteracted(true);
+        try { (e.target as HTMLElement).setPointerCapture(e.pointerId); } catch {}
+        setDragState({
+          isDragging: true,
+          target: 'lqr_cart',
+          history: [{ x: coords.x, y: coords.y, t: performance.now() }]
+        });
+      }
+    }
+  };
+
+  // Pointer Move: Drag or Hover
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const coords = getCanvasCoords(e);
+    const pivotX = canvas.width / 2;
+    const pivotY = DOUBLE_PENDULUM_PIVOT_Y;
+
+    if (dragState.isDragging) {
+      if (dragState.target === 'single_bob') {
+        const newTheta = Math.atan2(coords.x - pivotX, coords.y - pivotY);
+        setSimState((prev) => ({ ...prev, theta: newTheta, omega: 0 }));
+        setInitialAngleDeg(radToDeg(newTheta));
+        setDragState((prev) => ({
+          ...prev,
+          history: [...prev.history.slice(-4), { x: coords.x, y: coords.y, t: performance.now() }]
+        }));
+      } else if (dragState.target === 'double_bob2') {
+        const b1X = pivotX + DOUBLE_PENDULUM_ARM1_PX * Math.sin(doubleState.th1);
+        const b1Y = pivotY + DOUBLE_PENDULUM_ARM1_PX * Math.cos(doubleState.th1);
+        const th2 = Math.atan2(coords.x - b1X, coords.y - b1Y);
+        setDoubleState((prev) => ({ ...prev, th2, om2: 0 }));
+      } else if (dragState.target === 'double_bob1') {
+        const th1 = Math.atan2(coords.x - pivotX, coords.y - pivotY);
+        setDoubleState((prev) => ({ ...prev, th1, om1: 0 }));
+      } else if (dragState.target === 'lqr_pole') {
+        const cartX = pivotX + cartPoleState.x * 120;
+        const groundY = 250;
+        const th = Math.atan2(coords.x - cartX, groundY - coords.y);
+        setCartPoleState((prev) => ({ ...prev, theta: Math.max(-0.6, Math.min(0.6, th)), omega: 0 }));
+      } else if (dragState.target === 'lqr_cart') {
+        const newX = (coords.x - pivotX) / 120;
+        setCartPoleState((prev) => ({ ...prev, x: Math.max(-1.8, Math.min(1.8, newX)), v: 0 }));
+      }
+    } else {
+      // Hover detection
+      if (mechanism === 'single') {
+        const armPx = Math.max(110, Math.min(220, 130 + lengthMeters * 50));
+        const bobX = pivotX + armPx * Math.sin(activeTheta);
+        const bobY = pivotY + armPx * Math.cos(activeTheta);
+        if (Math.hypot(coords.x - bobX, coords.y - bobY) <= 30) {
+          setHoverTarget('single_bob');
+          canvas.style.cursor = 'grab';
+        } else {
+          setHoverTarget(null);
+          canvas.style.cursor = 'default';
+        }
+      } else if (mechanism === 'double') {
+        const b1X = pivotX + DOUBLE_PENDULUM_ARM1_PX * Math.sin(doubleState.th1);
+        const b1Y = pivotY + DOUBLE_PENDULUM_ARM1_PX * Math.cos(doubleState.th1);
+        const b2X = b1X + DOUBLE_PENDULUM_ARM2_PX * Math.sin(doubleState.th2);
+        const b2Y = b1Y + DOUBLE_PENDULUM_ARM2_PX * Math.cos(doubleState.th2);
+        if (Math.hypot(coords.x - b2X, coords.y - b2Y) <= 28 || Math.hypot(coords.x - b1X, coords.y - b1Y) <= 28) {
+          canvas.style.cursor = 'grab';
+        } else {
+          canvas.style.cursor = 'default';
+        }
+      } else if (mechanism === 'lqr') {
+        const cartX = pivotX + cartPoleState.x * 120;
+        const groundY = 250;
+        const polePx = 110;
+        const tipX = cartX + polePx * Math.sin(cartPoleState.theta);
+        const tipY = groundY - polePx * Math.cos(cartPoleState.theta);
+        if (Math.hypot(coords.x - tipX, coords.y - tipY) <= 30 || (Math.abs(coords.x - cartX) <= 35 && Math.abs(coords.y - groundY) <= 25)) {
+          canvas.style.cursor = 'grab';
+        } else {
+          canvas.style.cursor = 'default';
+        }
+      }
+    }
+  };
+
+  // Pointer Up: Release with computed release velocity
+  const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!dragState.isDragging) return;
+    try {
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+
+    if (dragState.target === 'single_bob') {
+      const canvas = canvasRef.current;
+      const pivotX = canvas ? canvas.width / 2 : 310;
+      const pivotY = DOUBLE_PENDULUM_PIVOT_Y;
+      const h = dragState.history;
+      let releaseOmega = 0;
+      if (h.length >= 2) {
+        const p1 = h[h.length - 2];
+        const p2 = h[h.length - 1];
+        const dt = (p2.t - p1.t) / 1000;
+        if (dt > 0.005) {
+          const th1 = Math.atan2(p1.x - pivotX, p1.y - pivotY);
+          const th2 = Math.atan2(p2.x - pivotX, p2.y - pivotY);
+          releaseOmega = Math.max(-12, Math.min(12, (th2 - th1) / dt));
+        }
+      }
+
+      setSimState((prev) => ({ ...prev, omega: releaseOmega }));
+      physicsAudio.updatePhysicsAudio(releaseOmega, simState.theta, 0.4);
+    }
+
+    setDragState({
+      isDragging: false,
+      target: null,
+      history: []
+    });
+    setIsSimRunning(true);
+  };
+
   // Reset to fitted parameters
   const handleResetToFitted = useCallback(() => {
     if (!fittedParameters) return;
@@ -154,20 +366,34 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
   }, [fittedParameters, handleResetToFitted]);
 
   // Presets
-  const applyPreset = (preset: 'fitted' | 'moon' | 'jupiter' | 'viscous') => {
+  const applyPreset = (preset: 'fitted' | 'earth' | 'moon' | 'mars' | 'jupiter' | 'viscous' | 'inverted' | 'large_amp') => {
     if (preset === 'fitted') {
       handleResetToFitted();
+    } else if (preset === 'earth') {
+      setGravity(9.80665);
+      setDamping(0.15);
+      setSimState((prev) => ({ ...prev, omega: 0 }));
     } else if (preset === 'moon') {
       setGravity(1.62);
-      setDamping(0.0);
+      setDamping(0.02);
+      setSimState((prev) => ({ ...prev, omega: 0 }));
+    } else if (preset === 'mars') {
+      setGravity(3.71);
+      setDamping(0.08);
       setSimState((prev) => ({ ...prev, omega: 0 }));
     } else if (preset === 'jupiter') {
       setGravity(24.79);
       setDamping(0.35);
       setSimState((prev) => ({ ...prev, omega: 0 }));
     } else if (preset === 'viscous') {
-      setDamping(1.2);
+      setDamping(1.50);
       setSimState((prev) => ({ ...prev, omega: 0 }));
+    } else if (preset === 'inverted') {
+      setSimState((prev) => ({ ...prev, theta: Math.PI * 0.98, omega: 0.05 }));
+      setInitialAngleDeg(176.4);
+    } else if (preset === 'large_amp') {
+      setSimState((prev) => ({ ...prev, theta: degToRad(75), omega: 0 }));
+      setInitialAngleDeg(75);
     }
   };
 
@@ -185,7 +411,7 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
 
   // Real-time animation loop for free-running simulation
   useEffect(() => {
-    if ((isSyncedWithVideo && mechanism === 'single') || !isSimRunning) return;
+    if ((isSyncedWithVideo && mechanism === 'single') || !isSimRunning || dragState.isDragging) return;
 
     let animationFrameId: number;
     let lastTime = performance.now();
@@ -356,6 +582,7 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
   }, [
     isSyncedWithVideo,
     isSimRunning,
+    dragState.isDragging,
     gravity,
     lengthMeters,
     damping,
@@ -468,6 +695,42 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
       ctx.strokeStyle = '#e0f2fe';
       ctx.lineWidth = 1.5;
       ctx.stroke();
+
+      // Direct manipulation target halo and angle badge
+      if (dragState.isDragging && dragState.target === 'single_bob') {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(bobX, bobY, 26, 0, Math.PI * 2);
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Angle Callout Badge
+        const degStr = `${(activeTheta * 180 / Math.PI).toFixed(1)}°`;
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(bobX - 32, bobY - 44, 64, 22);
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(bobX - 32, bobY - 44, 64, 22);
+
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = 'bold 11px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`θ: ${degStr}`, bobX, bobY - 33);
+        ctx.restore();
+      } else if (hoverTarget === 'single_bob') {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(bobX, bobY, 24, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.6)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 3]);
+        ctx.stroke();
+        ctx.restore();
+      }
 
       // Pivot Mount
       ctx.beginPath();
@@ -725,7 +988,17 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
       ctx.lineWidth = 1;
       ctx.stroke();
     }
-  }, [mechanism, activeTheta, lengthMeters, doubleState, cartPoleState, lqrTargetX]);
+  }, [
+    mechanism,
+    activeTheta,
+    lengthMeters,
+    doubleState,
+    cartPoleState,
+    lqrTargetX,
+    dragState.isDragging,
+    dragState.target,
+    hoverTarget
+  ]);
 
   // Energy Bar Gauges
   const maxBarEnergy = Math.max(0.01, simState.total * 1.15 || 0.5);
@@ -792,8 +1065,20 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
           ref={canvasRef}
           width={620}
           height={320}
-          className="max-h-full max-w-full aspect-[620/320] object-contain rounded border border-graphite-800/80"
+          className="max-h-full max-w-full aspect-[620/320] object-contain rounded border border-graphite-800/80 cursor-grab active:cursor-grabbing touch-none select-none"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
         />
+
+        {/* Drag Hint Tooltip */}
+        {!hasInteracted && !dragState.isDragging && (
+          <div className="absolute bottom-12 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-graphite-900/90 border border-graphite-700/70 text-[10px] font-mono text-graphite-300 pointer-events-none flex items-center gap-1.5 shadow-lg backdrop-blur-sm animate-pulse">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+            <span>Click & drag bob to set angle</span>
+          </div>
+        )}
 
         {/* Telemetry Strip Overlay */}
         {mechanism === 'single' ? (
@@ -966,23 +1251,43 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
             Fitted Twin
           </button>
           <button
+            onClick={() => applyPreset('earth')}
+            className="px-2 py-0.5 rounded bg-graphite-800 hover:bg-graphite-750 text-graphite-200 border border-graphite-700/80 transition flex items-center gap-1"
+          >
+            <Globe className="w-2.5 h-2.5 text-emerald-400" />
+            Earth 1g
+          </button>
+          <button
             onClick={() => applyPreset('moon')}
             className="px-2 py-0.5 rounded bg-graphite-800 hover:bg-graphite-750 text-graphite-200 border border-graphite-700/80 transition flex items-center gap-1"
           >
             <Globe className="w-2.5 h-2.5 text-blue-300" />
-            Moon (1.62 m/s²)
+            Moon 0.16g
           </button>
           <button
-            onClick={() => applyPreset('jupiter')}
-            className="px-2 py-0.5 rounded bg-graphite-800 hover:bg-graphite-750 text-graphite-200 border border-graphite-700/80 transition"
+            onClick={() => applyPreset('mars')}
+            className="px-2 py-0.5 rounded bg-graphite-800 hover:bg-graphite-750 text-graphite-200 border border-graphite-700/80 transition flex items-center gap-1"
           >
-            Jupiter (24.8 m/s²)
+            <Globe className="w-2.5 h-2.5 text-amber-400" />
+            Mars 0.38g
           </button>
           <button
             onClick={() => applyPreset('viscous')}
             className="px-2 py-0.5 rounded bg-graphite-800 hover:bg-graphite-750 text-graphite-200 border border-graphite-700/80 transition"
           >
-            Viscous (c=1.20)
+            Fluid (c=1.50)
+          </button>
+          <button
+            onClick={() => applyPreset('large_amp')}
+            className="px-2 py-0.5 rounded bg-graphite-800 hover:bg-graphite-750 text-graphite-200 border border-graphite-700/80 transition"
+          >
+            75° Non-Linear
+          </button>
+          <button
+            onClick={() => applyPreset('inverted')}
+            className="px-2 py-0.5 rounded bg-amber-950/40 hover:bg-amber-900/40 text-amber-300 border border-amber-500/30 transition font-semibold"
+          >
+            Invert ±180°
           </button>
         </div>
 

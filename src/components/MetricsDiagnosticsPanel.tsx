@@ -42,6 +42,7 @@ import {
   generateRos2NodeScript,
   generateArduinoCppFirmware,
   generateMatlabSimulinkScript,
+  generateInteractiveHtmlReport,
   downloadTextFile
 } from '@/lib/export/exportUtils';
 import { computeSpectralAnalysis } from '@/lib/physics/fft';
@@ -1450,16 +1451,36 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
                 Download raw empirical angles, fitted trajectory coordinates, baseline benchmark points, standalone Python simulation scripts, or a formal Verification Certificate.
               </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 mb-2">
                 <button
                   onClick={() => {
                     const csv = generateTelemetryCSV(comparisonPoints);
                     downloadTextFile('aethertwin_telemetry.csv', csv, 'text/csv');
                   }}
-                  className="px-3 py-2 rounded bg-graphite-800 hover:bg-graphite-750 text-graphite-200 border border-graphite-700 flex items-center justify-center gap-1.5 transition text-[11px]"
+                  className="px-2.5 py-2 rounded bg-graphite-800 hover:bg-graphite-750 text-graphite-200 border border-graphite-700 flex items-center justify-center gap-1.5 transition text-[11px]"
+                  title="Raw angles, angular velocity, and baseline holdout coordinates"
                 >
                   <FileText className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Download CSV</span>
+                  <span>CSV Data</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (!fittedParameters || !metrics) return;
+                    const html = generateInteractiveHtmlReport(
+                      fittedParameters,
+                      metrics,
+                      comparisonPoints,
+                      lqrModel,
+                      calibration
+                    );
+                    downloadTextFile('aethertwin_verification_report.html', html, 'text/html');
+                  }}
+                  className="px-2.5 py-2 rounded bg-graphite-800 hover:bg-graphite-750 text-graphite-200 border border-graphite-700 flex items-center justify-center gap-1.5 transition text-[11px]"
+                  title="Interactive offline HTML verification report with embedded SVG plots"
+                >
+                  <FileText className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>HTML Report</span>
                 </button>
 
                 <button
@@ -1468,7 +1489,8 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
                     const py = generatePythonReproductionScript(fittedParameters, metrics, calibration);
                     downloadTextFile('simulate_aethertwin.py', py, 'text/x-python');
                   }}
-                  className="px-3 py-2 rounded bg-graphite-800 hover:bg-graphite-750 text-graphite-200 border border-graphite-700 flex items-center justify-center gap-1.5 transition text-[11px]"
+                  className="px-2.5 py-2 rounded bg-graphite-800 hover:bg-graphite-750 text-graphite-200 border border-graphite-700 flex items-center justify-center gap-1.5 transition text-[11px]"
+                  title="SciPy solve_ivp simulation and Matplotlib plotting script"
                 >
                   <FileCode className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Python Script</span>
@@ -1485,7 +1507,8 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
                     );
                     downloadTextFile('Verification_Certificate.md', cert, 'text/markdown');
                   }}
-                  className="px-3 py-2 rounded bg-graphite-800 hover:bg-graphite-750 text-graphite-200 border border-graphite-700 flex items-center justify-center gap-1.5 transition text-[11px]"
+                  className="px-2.5 py-2 rounded bg-graphite-800 hover:bg-graphite-750 text-graphite-200 border border-graphite-700 flex items-center justify-center gap-1.5 transition text-[11px]"
+                  title="Formal scientific audit certificate with provenance hash"
                 >
                   <CheckCircle className="w-3.5 h-3.5 text-amber-400" />
                   <span>Certificate (.md)</span>

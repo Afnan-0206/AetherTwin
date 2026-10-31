@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Play, Upload, RotateCcw, HelpCircle, Ruler, Activity, Layers, Volume2, VolumeX, LayoutDashboard, Grid3X3 } from 'lucide-react';
+import { Play, Upload, RotateCcw, HelpCircle, Ruler, Activity, Layers, Volume2, VolumeX, LayoutDashboard, Grid3X3, Sparkles } from 'lucide-react';
 import { BenchmarkPresetId } from '@/lib/types';
 import { BENCHMARK_PRESETS } from '@/lib/sample/syntheticPendulum';
 
@@ -13,6 +13,7 @@ interface HeaderProps {
   onReset: () => void;
   onOpenHelp: () => void;
   onOpenCalibration?: () => void;
+  onOpenTour?: () => void;
   isProcessing: boolean;
   hasData: boolean;
   isDemoMode: boolean;
@@ -31,6 +32,7 @@ export const Header: React.FC<HeaderProps> = ({
   onReset,
   onOpenHelp,
   onOpenCalibration,
+  onOpenTour,
   isProcessing,
   hasData,
   isDemoMode,
@@ -193,6 +195,17 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Ruler className="w-3.5 h-3.5" />
               <span className="hidden lg:inline">Calibration</span>
+            </button>
+          )}
+
+          {onOpenTour && (
+            <button
+              onClick={onOpenTour}
+              className="focus-ring px-2.5 py-1.5 rounded bg-blue-950/40 hover:bg-blue-900/40 text-blue-300 border border-blue-500/30 text-[11px] font-mono transition-colors flex items-center gap-1.5"
+              title="Interactive 5-step Guided Architecture Tour"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+              <span className="hidden sm:inline">Tour</span>
             </button>
           )}
 
