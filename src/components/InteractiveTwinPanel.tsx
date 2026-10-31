@@ -4,13 +4,17 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { PendulumParameters, SimulationState } from '@/lib/types';
 import { rk4Step } from '@/lib/physics/rk4';
 import { calculateEnergy, radToDeg, degToRad } from '@/lib/physics/dampedPendulum';
+import { rk4StepDoublePendulum, calculateDoublePendulumEnergy } from '@/lib/physics/doublePendulum';
+import { physicsAudio } from '@/lib/audio/physicsAudio';
 import {
   RotateCcw,
   Sliders,
   Activity,
   RefreshCw,
   Globe,
-  Gauge
+  Gauge,
+  Flame,
+  Shuffle
 } from 'lucide-react';
 import { ProvenanceBadge } from './ProvenanceBadge';
 
@@ -29,7 +33,10 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Counterfactual parameter state
+  // Mechanism Mode: 1-DOF Planar vs 2-DOF Chaotic Double Pendulum
+  const [mechanism, setMechanism] = useState<'single' | 'double'>('single');
+
+  // Single Pendulum Parameters
   const defaultGravity = fittedParameters?.gravity ?? 9.81;
   const defaultLength = fittedParameters?.length ?? 0.50;
   const defaultDamping = fittedParameters?.damping ?? 0.15;
@@ -40,7 +47,7 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
   const [damping, setDamping] = useState<number>(defaultDamping);
   const [initialAngleDeg, setInitialAngleDeg] = useState<number>(defaultTheta0);
 
-  // Live simulation state for free-running twin
+  // Live simulation state for single twin
   const [simState, setSimState] = useState<{
     theta: number;
     omega: number;
@@ -55,6 +62,28 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
     kinetic: 0.0,
     potential: 0.0,
     total: 0.0
+  });
+
+  // Double Pendulum Simulation State
+  const [doubleState, setDoubleState] = useState<{
+    th1: number;
+    om1: number;
+    th2: number;
+    om2: number;
+    // Perturbed shadow twin for visual chaos demonstration
+    th1B?: number;
+    om1B?: number;
+    th2B?: number;
+    om2B?: number;
+    divergenceDeg: number;
+    trail: { x: number; y: number }[];
+  }>({
+    th1: 1.3,
+    om1: 0,
+    th2: 1.1,
+    om2: 0,
+    divergenceDeg: 0,
+    trail: []
   });
 
   const [isSimRunning, setIsSimRunning] = useState<boolean>(!isSyncedWithVideo);
@@ -107,9 +136,21 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
     }
   };
 
+  // Perturb double pendulum
+  const triggerChaosPerturbation = () => {
+    setDoubleState((prev) => ({
+      ...prev,
+      th1B: prev.th1 + 0.0001, // 0.0057 degrees perturbation
+      om1B: prev.om1,
+      th2B: prev.th2,
+      om2B: prev.om2,
+      divergenceDeg: 0.0057
+    }));
+  };
+
   // Real-time animation loop for free-running simulation
   useEffect(() => {
-    if (isSyncedWithVideo || !isSimRunning) return;
+    if ((isSyncedWithVideo && mechanism === 'single') || !isSimRunning) return;
 
     let animationFrameId: number;
     let lastTime = performance.now();
@@ -118,62 +159,138 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
       const elapsedSec = Math.min(0.05, (currentTime - lastTime) / 1000);
       lastTime = currentTime;
 
-      setSimState((current) => {
-        const omega0Sq = gravity / Math.max(0.05, lengthMeters);
-        const params = {
-          omega0Sq,
-          damping,
-          length: lengthMeters,
-          gravity
-        };
+      if (mechanism === 'single') {
+        setSimState((current) => {
+          const omega0Sq = gravity / Math.max(0.05, lengthMeters);
+          const params = {
+            omega0Sq,
+            damping,
+            dampingQuadratic: fittedParameters?.dampingQuadratic,
+            length: lengthMeters,
+            gravity
+          };
 
-        // Fine sub-stepping for smooth, stable RK4
-        const substepDt = 0.002;
-        const numSubsteps = Math.max(1, Math.ceil(elapsedSec / substepDt));
-        const dt = elapsedSec / numSubsteps;
+          const substepDt = 0.002;
+          const numSubsteps = Math.max(1, Math.ceil(elapsedSec / substepDt));
+          const dt = elapsedSec / numSubsteps;
 
-        let th = current.theta;
-        let om = current.omega;
+          let th = current.theta;
+          let om = current.omega;
 
-        for (let i = 0; i < numSubsteps; i++) {
-          const next = rk4Step(th, om, dt, params);
-          th = next.theta;
-          om = next.omega;
-        }
+          for (let i = 0; i < numSubsteps; i++) {
+            const next = rk4Step(th, om, dt, params);
+            th = next.theta;
+            om = next.omega;
+          }
 
-        const alpha = -omega0Sq * Math.sin(th) - damping * om;
-        const energy = calculateEnergy(th, om, {
-          omega0Sq,
-          damping,
-          initialAngle: 0,
-          initialVelocity: 0,
-          length: lengthMeters,
-          gravity
+          const alpha = -omega0Sq * Math.sin(th) - damping * om;
+          const energy = calculateEnergy(th, om, {
+            omega0Sq,
+            damping,
+            initialAngle: 0,
+            initialVelocity: 0,
+            length: lengthMeters,
+            gravity
+          });
+
+          // Web Audio Sonification sync
+          physicsAudio.updatePhysicsAudio(om, th, energy.total / 0.5);
+
+          return {
+            theta: th,
+            omega: om,
+            alpha,
+            kinetic: energy.kinetic,
+            potential: energy.potential,
+            total: energy.total
+          };
         });
+      } else {
+        // Double pendulum simulation loop
+        setDoubleState((prev) => {
+          const dParams = {
+            l1: 0.28,
+            l2: 0.24,
+            m1: 0.5,
+            m2: 0.5,
+            gravity,
+            damping1: damping * 0.4,
+            damping2: damping * 0.4
+          };
 
-        return {
-          theta: th,
-          omega: om,
-          alpha,
-          kinetic: energy.kinetic,
-          potential: energy.potential,
-          total: energy.total
-        };
-      });
+          const substepDt = 0.001;
+          const numSubsteps = Math.max(1, Math.ceil(elapsedSec / substepDt));
+          const dt = elapsedSec / numSubsteps;
+
+          let th1 = prev.th1;
+          let om1 = prev.om1;
+          let th2 = prev.th2;
+          let om2 = prev.om2;
+
+          let th1B = prev.th1B ?? th1;
+          let om1B = prev.om1B ?? om1;
+          let th2B = prev.th2B ?? th2;
+          let om2B = prev.om2B ?? om2;
+
+          for (let i = 0; i < numSubsteps; i++) {
+            const nextA = rk4StepDoublePendulum(th1, om1, th2, om2, dt, dParams);
+            th1 = nextA.theta1;
+            om1 = nextA.omega1;
+            th2 = nextA.theta2;
+            om2 = nextA.omega2;
+
+            if (prev.th1B !== undefined) {
+              const nextB = rk4StepDoublePendulum(th1B, om1B, th2B, om2B, dt, dParams);
+              th1B = nextB.theta1;
+              om1B = nextB.omega1;
+              th2B = nextB.theta2;
+              om2B = nextB.omega2;
+            }
+          }
+
+          const divRad = Math.hypot(th1 - th1B, th2 - th2B);
+
+          // Update trail of tip bob
+          const pivX = 310;
+          const pivY = 60;
+          const arm1Px = 95;
+          const arm2Px = 80;
+          const tipX = pivX + arm1Px * Math.sin(th1) + arm2Px * Math.sin(th2);
+          const tipY = pivY + arm1Px * Math.cos(th1) + arm2Px * Math.cos(th2);
+
+          const nextTrail = [...prev.trail.slice(-90), { x: tipX, y: tipY }];
+
+          // Web Audio Sonification
+          physicsAudio.updatePhysicsAudio(om2, th2, 0.7);
+
+          return {
+            th1,
+            om1,
+            th2,
+            om2,
+            th1B: prev.th1B !== undefined ? th1B : undefined,
+            om1B: prev.om1B !== undefined ? om1B : undefined,
+            th2B: prev.th2B !== undefined ? th2B : undefined,
+            om2B: prev.om2B !== undefined ? om2B : undefined,
+            divergenceDeg: Number(radToDeg(divRad).toFixed(2)),
+            trail: nextTrail
+          };
+        });
+      }
 
       animationFrameId = requestAnimationFrame(loop);
     };
 
     animationFrameId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(animationFrameId);
-  }, [isSyncedWithVideo, isSimRunning, gravity, lengthMeters, damping]);
+  }, [isSyncedWithVideo, isSimRunning, gravity, lengthMeters, damping, mechanism, fittedParameters]);
 
-  // Determine current display angle
+  // Determine current display angle for single pendulum
   const activeTheta = isSyncedWithVideo
     ? degToRad(videoSyncedAngleDeg ?? defaultTheta0)
     : simState.theta;
 
-  // Render 2D Twin Canvas with Protractor Graduations
+  // Render 2D Canvas (Single or Double Pendulum)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -184,238 +301,352 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
     const height = canvas.height;
     ctx.clearRect(0, 0, width, height);
 
-    // Dark backdrop
     ctx.fillStyle = '#07090e';
     ctx.fillRect(0, 0, width, height);
 
     const pivotX = width / 2;
-    const pivotY = 48;
-    // Scale visual arm length based on lengthMeters (0.2m -> 110px, 2.0m -> 210px)
-    const armPx = Math.max(110, Math.min(220, 130 + lengthMeters * 50));
+    const pivotY = 52;
 
-    const bobX = pivotX + armPx * Math.sin(activeTheta);
-    const bobY = pivotY + armPx * Math.cos(activeTheta);
+    if (mechanism === 'single') {
+      const armPx = Math.max(110, Math.min(220, 130 + lengthMeters * 50));
+      const bobX = pivotX + armPx * Math.sin(activeTheta);
+      const bobY = pivotY + armPx * Math.cos(activeTheta);
 
-    // 1. Draw protractor graduation marks along swing arc
-    const protractorR = armPx + 15;
-    ctx.beginPath();
-    ctx.arc(pivotX, pivotY, protractorR, Math.PI * 0.25, Math.PI * 0.75);
-    ctx.strokeStyle = 'rgba(148, 163, 184, 0.15)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    // Graduation ticks
-    const graduations = [-60, -45, -30, -15, 0, 15, 30, 45, 60];
-    graduations.forEach((deg) => {
-      const rad = Math.PI / 2 - degToRad(deg);
-      const isMajor = deg % 30 === 0;
-      const rInner = protractorR - (isMajor ? 8 : 4);
-      const rOuter = protractorR + 2;
-
-      const x1 = pivotX + rInner * Math.cos(rad);
-      const y1 = pivotY + rInner * Math.sin(rad);
-      const x2 = pivotX + rOuter * Math.cos(rad);
-      const y2 = pivotY + rOuter * Math.sin(rad);
-
+      // Protractor graduation arc
+      const protractorR = armPx + 15;
       ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.strokeStyle = isMajor ? 'rgba(148, 163, 184, 0.4)' : 'rgba(148, 163, 184, 0.2)';
+      ctx.arc(pivotX, pivotY, protractorR, Math.PI * 0.25, Math.PI * 0.75);
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.15)';
       ctx.lineWidth = 1;
       ctx.stroke();
 
-      if (isMajor) {
-        const xText = pivotX + (protractorR + 14) * Math.cos(rad);
-        const yText = pivotY + (protractorR + 14) * Math.sin(rad);
-        ctx.fillStyle = '#64748b';
-        ctx.font = '8px monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(`${deg > 0 ? '+' : ''}${deg}°`, xText, yText);
+      const graduations = [-60, -45, -30, -15, 0, 15, 30, 45, 60];
+      graduations.forEach((deg) => {
+        const rad = Math.PI / 2 - degToRad(deg);
+        const isMajor = deg % 30 === 0;
+        const rInner = protractorR - (isMajor ? 8 : 4);
+        const rOuter = protractorR + 2;
+
+        const x1 = pivotX + rInner * Math.cos(rad);
+        const y1 = pivotY + rInner * Math.sin(rad);
+        const x2 = pivotX + rOuter * Math.cos(rad);
+        const y2 = pivotY + rOuter * Math.sin(rad);
+
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.strokeStyle = isMajor ? 'rgba(148, 163, 184, 0.4)' : 'rgba(148, 163, 184, 0.2)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        if (isMajor) {
+          const xText = pivotX + (protractorR + 14) * Math.cos(rad);
+          const yText = pivotY + (protractorR + 14) * Math.sin(rad);
+          ctx.fillStyle = '#64748b';
+          ctx.font = '8px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(`${deg > 0 ? '+' : ''}${deg}°`, xText, yText);
+        }
+      });
+
+      // Vertical zero plumb line
+      ctx.beginPath();
+      ctx.moveTo(pivotX, pivotY);
+      ctx.lineTo(pivotX, pivotY + armPx + 25);
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.18)';
+      ctx.setLineDash([3, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Pendulum Rod
+      ctx.beginPath();
+      ctx.moveTo(pivotX, pivotY);
+      ctx.lineTo(bobX, bobY);
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      // Bob Shadow/Glow
+      const bobGrad = ctx.createRadialGradient(
+        bobX - 4,
+        bobY - 4,
+        2,
+        bobX,
+        bobY,
+        18
+      );
+      bobGrad.addColorStop(0, '#bae6fd');
+      bobGrad.addColorStop(0.4, '#38bdf8');
+      bobGrad.addColorStop(1, '#0284c7');
+
+      ctx.beginPath();
+      ctx.arc(bobX, bobY, 16, 0, 2 * Math.PI);
+      ctx.fillStyle = bobGrad;
+      ctx.fill();
+      ctx.strokeStyle = '#e0f2fe';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Pivot Mount
+      ctx.beginPath();
+      ctx.arc(pivotX, pivotY, 6, 0, 2 * Math.PI);
+      ctx.fillStyle = '#f8fafc';
+      ctx.fill();
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    } else {
+      // DOUBLE PENDULUM RENDERING
+      const arm1Px = 95;
+      const arm2Px = 80;
+
+      const j1X = pivotX + arm1Px * Math.sin(doubleState.th1);
+      const j1Y = pivotY + arm1Px * Math.cos(doubleState.th1);
+
+      const j2X = j1X + arm2Px * Math.sin(doubleState.th2);
+      const j2Y = j1Y + arm2Px * Math.cos(doubleState.th2);
+
+      // Chaotic ribbon trail
+      if (doubleState.trail.length > 2) {
+        ctx.beginPath();
+        ctx.moveTo(doubleState.trail[0].x, doubleState.trail[0].y);
+        for (let i = 1; i < doubleState.trail.length; i++) {
+          ctx.lineTo(doubleState.trail[i].x, doubleState.trail[i].y);
+        }
+        ctx.strokeStyle = 'rgba(168, 85, 247, 0.45)';
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
       }
-    });
 
-    // 2. Vertical zero plumb line
-    ctx.beginPath();
-    ctx.moveTo(pivotX, pivotY);
-    ctx.lineTo(pivotX, pivotY + armPx + 25);
-    ctx.strokeStyle = 'rgba(148, 163, 184, 0.18)';
-    ctx.setLineDash([3, 3]);
-    ctx.stroke();
-    ctx.setLineDash([]);
+      // Perturbed Shadow Twin (Amber)
+      if (doubleState.th1B !== undefined && doubleState.th2B !== undefined) {
+        const j1BX = pivotX + arm1Px * Math.sin(doubleState.th1B);
+        const j1BY = pivotY + arm1Px * Math.cos(doubleState.th1B);
+        const j2BX = j1BX + arm2Px * Math.sin(doubleState.th2B);
+        const j2BY = j1BY + arm2Px * Math.cos(doubleState.th2B);
 
-    // 3. Current displacement arc
-    const arcR = 38;
-    const startAngle = Math.PI / 2;
-    const endAngle = Math.PI / 2 - activeTheta;
-    ctx.beginPath();
-    ctx.arc(
-      pivotX,
-      pivotY,
-      arcR,
-      Math.min(startAngle, endAngle),
-      Math.max(startAngle, endAngle)
-    );
-    ctx.strokeStyle = '#3b82f6';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(pivotX, pivotY);
+        ctx.lineTo(j1BX, j1BY);
+        ctx.lineTo(j2BX, j2BY);
+        ctx.strokeStyle = 'rgba(245, 158, 11, 0.6)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
 
-    // 4. Digital Twin Rod
-    ctx.beginPath();
-    ctx.moveTo(pivotX, pivotY);
-    ctx.lineTo(bobX, bobY);
-    ctx.strokeStyle = '#94a3b8';
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(j2BX, j2BY, 8, 0, 2 * Math.PI);
+        ctx.fillStyle = 'rgba(245, 158, 11, 0.4)';
+        ctx.fill();
+        ctx.strokeStyle = '#f59e0b';
+        ctx.stroke();
+      }
 
-    // Thin inner core highlight
-    ctx.beginPath();
-    ctx.moveTo(pivotX, pivotY);
-    ctx.lineTo(bobX, bobY);
-    ctx.strokeStyle = '#e2e8f0';
-    ctx.lineWidth = 1;
-    ctx.stroke();
+      // Arm 1
+      ctx.beginPath();
+      ctx.moveTo(pivotX, pivotY);
+      ctx.lineTo(j1X, j1Y);
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
 
-    // 5. Digital Twin Bob
-    const bobRadius = 16;
-    const grad = ctx.createRadialGradient(
-      bobX - 4,
-      bobY - 4,
-      2,
-      bobX,
-      bobY,
-      bobRadius
-    );
-    grad.addColorStop(0, '#f8fafc');
-    grad.addColorStop(0.25, '#93c5fd');
-    grad.addColorStop(0.7, '#2563eb');
-    grad.addColorStop(1, '#1e3a8a');
+      // Bob 1
+      ctx.beginPath();
+      ctx.arc(j1X, j1Y, 11, 0, 2 * Math.PI);
+      ctx.fillStyle = '#0284c7';
+      ctx.fill();
+      ctx.strokeStyle = '#bae6fd';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
 
-    ctx.beginPath();
-    ctx.arc(bobX, bobY, bobRadius, 0, 2 * Math.PI);
-    ctx.fillStyle = grad;
-    ctx.fill();
-    ctx.strokeStyle = '#60a5fa';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+      // Arm 2
+      ctx.beginPath();
+      ctx.moveTo(j1X, j1Y);
+      ctx.lineTo(j2X, j2Y);
+      ctx.strokeStyle = '#a855f7';
+      ctx.lineWidth = 2;
+      ctx.stroke();
 
-    // 6. Pivot Mount & Bearing
-    ctx.fillStyle = '#1e2433';
-    ctx.fillRect(pivotX - 22, pivotY - 10, 44, 10);
-    ctx.strokeStyle = '#3b82f6';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(pivotX - 22, pivotY - 10, 44, 10);
+      // Bob 2 (Chaotic Tip)
+      ctx.beginPath();
+      ctx.arc(j2X, j2Y, 13, 0, 2 * Math.PI);
+      ctx.fillStyle = '#c084fc';
+      ctx.fill();
+      ctx.strokeStyle = '#f3e8ff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
 
-    ctx.beginPath();
-    ctx.arc(pivotX, pivotY, 4, 0, 2 * Math.PI);
-    ctx.fillStyle = '#ffffff';
-    ctx.fill();
-  }, [activeTheta, lengthMeters]);
+      // Pivot
+      ctx.beginPath();
+      ctx.arc(pivotX, pivotY, 6, 0, 2 * Math.PI);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }, [mechanism, activeTheta, lengthMeters, doubleState]);
 
-  // Total energy max estimate for gauge
-  const maxEnergy = Math.max(
-    0.05,
-    simState.total > 0 ? simState.total * 1.2 : 4.0
-  );
-  const potentialPercent = Math.min(100, Math.max(0, (simState.potential / maxEnergy) * 100));
-  const kineticPercent = Math.min(100, Math.max(0, (simState.kinetic / maxEnergy) * 100));
+  // Energy Bar Gauges
+  const maxBarEnergy = Math.max(0.01, simState.total * 1.15 || 0.5);
+  const potentialPercent = Math.min(100, (simState.potential / maxBarEnergy) * 100);
+  const kineticPercent = Math.min(100, (simState.kinetic / maxBarEnergy) * 100);
 
   return (
     <div className="flex flex-col h-full bg-graphite-900 border border-graphite-800/60 rounded-lg overflow-hidden">
-      {/* Titlebar */}
+      {/* Titlebar with Mechanism Mode Toggle */}
       <div className="flex items-center justify-between px-3.5 py-2 bg-[#0f1219] border-b border-graphite-800/60">
         <div className="flex items-center gap-2">
           <Activity className="w-3.5 h-3.5 text-blue-400" />
           <span className="font-mono text-xs font-semibold text-graphite-100 tracking-tight">
-            NUMERICAL SIMULATOR
+            DIGITAL TWIN SANDBOX
           </span>
-          <ProvenanceBadge kind="CALCULATED" text="RK4 SOLVER" />
+          <ProvenanceBadge kind="CALCULATED" text="RK4 INTEGRATOR" />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 font-mono text-[10px]">
           <button
-            onClick={onToggleSync}
-            className={`px-2 py-0.5 rounded text-[11px] font-mono transition flex items-center gap-1.5 border ${
-              isSyncedWithVideo
-                ? 'bg-blue-500/10 text-blue-300 border-blue-500/30'
-                : 'bg-graphite-800 text-graphite-300 border-graphite-700'
+            onClick={() => setMechanism('single')}
+            className={`px-2 py-0.5 rounded transition ${
+              mechanism === 'single'
+                ? 'bg-blue-600 text-white font-semibold'
+                : 'text-graphite-400 hover:text-graphite-200 bg-graphite-800'
             }`}
-            title="Toggle between real-time video sync and free counterfactual simulation"
           >
-            <RefreshCw className={`w-3 h-3 ${isSyncedWithVideo ? 'text-blue-400' : 'text-graphite-400'}`} />
-            <span>{isSyncedWithVideo ? 'VIDEO SYNCED' : 'FREE RUNTIME'}</span>
+            1-DOF Planar
+          </button>
+          <button
+            onClick={() => {
+              setMechanism('double');
+              setIsSimRunning(true);
+            }}
+            className={`px-2 py-0.5 rounded transition flex items-center gap-1 ${
+              mechanism === 'double'
+                ? 'bg-purple-600 text-white font-semibold'
+                : 'text-graphite-400 hover:text-graphite-200 bg-graphite-800'
+            }`}
+          >
+            <Flame className="w-2.5 h-2.5 text-amber-300" />
+            <span>2-DOF Chaos</span>
           </button>
         </div>
       </div>
 
-      {/* 2D Twin Visualization Viewport */}
-      <div className="relative flex-1 min-h-[220px] flex items-center justify-center bg-[#070910] p-2 overflow-hidden select-none">
+      {/* 2D Canvas Viewport */}
+      <div className="relative flex-1 min-h-[300px] flex items-center justify-center bg-[#07090e] p-2 overflow-hidden select-none">
         <canvas
           ref={canvasRef}
-          width={400}
-          height={290}
-          className="max-h-full max-w-full aspect-[4/3] object-contain rounded border border-graphite-800/80"
+          width={620}
+          height={320}
+          className="max-h-full max-w-full aspect-[620/320] object-contain rounded border border-graphite-800/80"
         />
 
-        {/* 4-Cell Digital Telemetry Grid (Top-Left) */}
-        <div className="absolute top-3 left-3 p-2 rounded bg-graphite-950/90 backdrop-blur-sm border border-graphite-800 font-mono text-[10px] space-y-1 pointer-events-none">
-          <div className="flex items-center justify-between gap-3 text-graphite-400">
-            <span>ANGLE θ</span>
-            <span className="text-blue-300 font-semibold tabular-nums">
-              {radToDeg(activeTheta).toFixed(2)}° ({activeTheta.toFixed(3)} rad)
-            </span>
+        {/* Telemetry Strip Overlay */}
+        {mechanism === 'single' ? (
+          <div className="absolute top-3 left-3 p-2 rounded bg-graphite-950/90 backdrop-blur-sm border border-graphite-800 font-mono text-[11px] space-y-1 shadow-sm pointer-events-none">
+            <div className="flex items-center justify-between gap-4 text-graphite-400 text-[10px]">
+              <span>TWIN ANGLE θ</span>
+              <span className="text-blue-300 font-semibold tabular-nums">
+                {radToDeg(activeTheta).toFixed(2)}°
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-4 text-graphite-400 text-[10px]">
+              <span>ANGULAR VELOCITY ω</span>
+              <span className="text-emerald-400 font-semibold tabular-nums">
+                {simState.omega.toFixed(2)} rad/s
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-4 text-graphite-400 text-[10px]">
+              <span>TOTAL ENERGY</span>
+              <span className="text-cyan-400 font-semibold tabular-nums">
+                {simState.total.toFixed(3)} J
+              </span>
+            </div>
           </div>
-          <div className="flex items-center justify-between gap-3 text-graphite-400">
-            <span>VELOCITY ω</span>
-            <span className="text-graphite-200 tabular-nums">
-              {simState.omega.toFixed(2)} rad/s
-            </span>
+        ) : (
+          <div className="absolute top-3 left-3 p-2 rounded bg-graphite-950/90 backdrop-blur-sm border border-graphite-800 font-mono text-[11px] space-y-1 shadow-sm pointer-events-none">
+            <div className="flex items-center justify-between gap-4 text-graphite-400 text-[10px]">
+              <span>ARM 1 θ₁</span>
+              <span className="text-blue-300 font-semibold tabular-nums">
+                {radToDeg(doubleState.th1).toFixed(1)}°
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-4 text-graphite-400 text-[10px]">
+              <span>ARM 2 θ₂</span>
+              <span className="text-purple-300 font-semibold tabular-nums">
+                {radToDeg(doubleState.th2).toFixed(1)}°
+              </span>
+            </div>
+            {doubleState.th1B !== undefined && (
+              <div className="flex items-center justify-between gap-4 text-amber-400 text-[10px]">
+                <span>CHAOS DIVERGENCE</span>
+                <span className="font-bold tabular-nums">
+                  {doubleState.divergenceDeg}°
+                </span>
+              </div>
+            )}
           </div>
-          <div className="flex items-center justify-between gap-3 text-graphite-400">
-            <span>ACCEL α</span>
-            <span className="text-graphite-300 tabular-nums">
-              {simState.alpha.toFixed(2)} rad/s²
-            </span>
-          </div>
-          <div className="flex items-center justify-between gap-3 text-graphite-400">
-            <span>TOTAL ENERGY</span>
-            <span className="text-emerald-400 font-semibold tabular-nums">
-              {simState.total.toFixed(3)} J
-            </span>
-          </div>
+        )}
+
+        {/* Live / Video Sync Controls */}
+        <div className="absolute top-3 right-3 flex items-center gap-1.5 font-mono text-[10px]">
+          {mechanism === 'single' ? (
+            <button
+              onClick={onToggleSync}
+              className={`px-2 py-1 rounded border transition flex items-center gap-1 ${
+                isSyncedWithVideo
+                  ? 'bg-blue-950/60 border-blue-500/40 text-blue-300'
+                  : 'bg-graphite-850 border-graphite-750 text-graphite-400'
+              }`}
+            >
+              <RefreshCw className="w-2.5 h-2.5" />
+              <span>{isSyncedWithVideo ? 'SYNCED TO VIDEO' : 'FREE SANDBOX'}</span>
+            </button>
+          ) : (
+            <button
+              onClick={triggerChaosPerturbation}
+              className="px-2 py-1 rounded bg-purple-950/60 border border-purple-500/40 text-purple-300 hover:bg-purple-900/60 transition flex items-center gap-1 font-semibold"
+              title="Add delta0 = 0.0001 rad perturbation to observe exponential divergence"
+            >
+              <Shuffle className="w-2.5 h-2.5 text-purple-400" />
+              <span>Perturb +0.0001 rad</span>
+            </button>
+          )}
         </div>
 
-        {/* Energy breakdown gauge (Bottom) */}
-        <div className="absolute bottom-3 left-3 right-3 p-2 rounded bg-graphite-950/90 backdrop-blur-sm border border-graphite-800 font-mono text-[10px] space-y-1">
-          <div className="flex justify-between text-graphite-400">
-            <span className="tracking-wider text-[9px] uppercase">MECHANICAL ENERGY SPECTRUM</span>
-            <span className="text-graphite-300 tabular-nums">
-              E: {simState.total.toFixed(3)} J
-            </span>
+        {/* Energy Bar Gauges (Single Pendulum) */}
+        {mechanism === 'single' && (
+          <div className="absolute bottom-3 left-3 right-3 p-2 rounded bg-graphite-950/85 backdrop-blur-sm border border-graphite-800/80 font-mono text-[10px] space-y-1">
+            <div className="flex justify-between text-graphite-400 text-[9px]">
+              <span>MECHANICAL ENERGY PARTITION</span>
+              <span className="text-graphite-300 tabular-nums">{simState.total.toFixed(3)} J Total</span>
+            </div>
+            <div className="w-full h-1.5 bg-graphite-800 rounded overflow-hidden flex">
+              <div
+                style={{ width: `${potentialPercent}%` }}
+                className="bg-emerald-500 transition-all duration-75"
+                title={`Potential: ${simState.potential.toFixed(3)} J`}
+              />
+              <div
+                style={{ width: `${kineticPercent}%` }}
+                className="bg-blue-500 transition-all duration-75"
+                title={`Kinetic: ${simState.kinetic.toFixed(3)} J`}
+              />
+            </div>
+            <div className="flex justify-between text-[9px]">
+              <span className="text-emerald-400 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                V: {simState.potential.toFixed(3)} J
+              </span>
+              <span className="text-blue-400 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                T: {simState.kinetic.toFixed(3)} J
+              </span>
+            </div>
           </div>
-          <div className="w-full h-1.5 rounded bg-graphite-850 overflow-hidden flex">
-            <div
-              style={{ width: `${potentialPercent}%` }}
-              className="bg-emerald-500 transition-all duration-75"
-              title={`Potential: ${simState.potential.toFixed(3)} J`}
-            />
-            <div
-              style={{ width: `${kineticPercent}%` }}
-              className="bg-blue-500 transition-all duration-75"
-              title={`Kinetic: ${simState.kinetic.toFixed(3)} J`}
-            />
-          </div>
-          <div className="flex justify-between text-[9px]">
-            <span className="text-emerald-400 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              Potential V: {simState.potential.toFixed(3)} J
-            </span>
-            <span className="text-blue-400 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-              Kinetic T: {simState.kinetic.toFixed(3)} J
-            </span>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Counterfactual Parameter Controls Section */}
@@ -423,12 +654,11 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
         <div className="flex items-center justify-between">
           <span className="text-graphite-200 font-semibold flex items-center gap-1.5 text-[11px]">
             <Sliders className="w-3 h-3 text-blue-400" />
-            COUNTERFACTUAL CONTROLS
+            {mechanism === 'single' ? 'COUNTERFACTUAL CONTROLS' : 'DOUBLE PENDULUM PARAMETERS'}
           </span>
           <button
             onClick={handleResetToFitted}
             className="text-[11px] text-blue-400 hover:text-blue-300 flex items-center gap-1 transition"
-            title="Reset parameters to empirical fitted values"
           >
             <RotateCcw className="w-3 h-3" />
             <span>Reset to Fitted</span>
@@ -464,9 +694,8 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
           </button>
         </div>
 
-        {/* Parameter Sliders Grid */}
+        {/* Sliders Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-0.5">
-          {/* Gravity */}
           <div>
             <div className="flex justify-between text-graphite-400 text-[11px] mb-1">
               <span>Gravity g</span>
@@ -483,7 +712,6 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
             />
           </div>
 
-          {/* Damping */}
           <div>
             <div className="flex justify-between text-graphite-400 text-[11px] mb-1">
               <span>Damping c</span>
@@ -500,7 +728,6 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
             />
           </div>
 
-          {/* Rod Length */}
           <div>
             <div className="flex justify-between text-graphite-400 text-[11px] mb-1">
               <span>Length L</span>
@@ -517,7 +744,6 @@ export const InteractiveTwinPanel: React.FC<InteractiveTwinPanelProps> = ({
             />
           </div>
 
-          {/* Release Angle */}
           <div>
             <div className="flex justify-between text-graphite-400 text-[11px] mb-1">
               <span>Angle θ₀</span>

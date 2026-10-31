@@ -28,6 +28,7 @@ import {
 } from '@/lib/sample/syntheticPendulum';
 import { fitDampedPendulum } from '@/lib/physics/parameterFitter';
 import { trackVideoInBrowser } from '@/lib/cv/opticalTracker';
+import { physicsAudio } from '@/lib/audio/physicsAudio';
 import { Play, Upload, Activity, ShieldCheck, ChevronRight, Layers, Compass, Zap, Cpu } from 'lucide-react';
 
 export default function Home() {
@@ -47,6 +48,7 @@ export default function Home() {
   const [isLiveDiagnostic, setIsLiveDiagnostic] = useState<boolean>(false);
   const [provenanceLog, setProvenanceLog] = useState<ProvenanceLogEntry[]>([]);
   const [activePresetId, setActivePresetId] = useState<BenchmarkPresetId>('standard');
+  const [isAudioActive, setIsAudioActive] = useState<boolean>(false);
 
   // Source media state
   const [isSyntheticSample, setIsSyntheticSample] = useState<boolean>(true);
@@ -441,7 +443,14 @@ export default function Home() {
     }
   };
 
+  const handleToggleAudio = () => {
+    const active = physicsAudio.toggle();
+    setIsAudioActive(active);
+  };
+
   const handleReset = () => {
+    physicsAudio.stop();
+    setIsAudioActive(false);
     setStage('idle');
     setError(undefined);
     setMeasurements([]);
@@ -472,6 +481,8 @@ export default function Home() {
         isSyntheticSample={isSyntheticSample}
         activePresetId={activePresetId}
         onSelectPreset={setActivePresetId}
+        isAudioActive={isAudioActive}
+        onToggleAudio={handleToggleAudio}
       />
 
       {/* Analysis Stage Pipeline Tracker */}
@@ -571,6 +582,7 @@ export default function Home() {
                 videoUrl={videoUrl}
                 isSyntheticSample={isSyntheticSample}
                 videoMetadata={videoMetadata}
+                predictedAngleDeg={comparisonPoints[currentFrameIndex]?.predictedAngleDeg}
               />
             </div>
 

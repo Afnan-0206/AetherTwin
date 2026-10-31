@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Play, Upload, RotateCcw, HelpCircle, Ruler, Activity, Layers } from 'lucide-react';
+import { Play, Upload, RotateCcw, HelpCircle, Ruler, Activity, Layers, Volume2, VolumeX } from 'lucide-react';
 import { BenchmarkPresetId } from '@/lib/types';
 import { BENCHMARK_PRESETS } from '@/lib/sample/syntheticPendulum';
 
@@ -17,6 +17,8 @@ interface HeaderProps {
   isSyntheticSample: boolean;
   activePresetId?: BenchmarkPresetId;
   onSelectPreset?: (presetId: BenchmarkPresetId) => void;
+  isAudioActive?: boolean;
+  onToggleAudio?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -30,7 +32,9 @@ export const Header: React.FC<HeaderProps> = ({
   isDemoMode,
   isSyntheticSample,
   activePresetId = 'standard',
-  onSelectPreset
+  onSelectPreset,
+  isAudioActive = false,
+  onToggleAudio
 }) => {
   return (
     <header className="border-b border-graphite-800/80 bg-[#0a0d14] sticky top-0 z-40 select-none">
@@ -49,7 +53,7 @@ export const Header: React.FC<HeaderProps> = ({
                   AetherTwin
                 </span>
                 <span className="text-[10px] font-mono px-1.5 py-px rounded bg-graphite-800/80 text-graphite-400 border border-graphite-750/60">
-                  v1.2
+                  v2.0
                 </span>
                 <span className="hidden sm:inline-block text-[10px] font-mono text-graphite-500 tracking-tight">
                   / Verified Motion Twin
@@ -107,6 +111,26 @@ export const Header: React.FC<HeaderProps> = ({
             </select>
           </div>
 
+          {/* Audio Sonification Toggle */}
+          {onToggleAudio && (
+            <button
+              onClick={onToggleAudio}
+              className={`focus-ring px-2.5 py-1.5 rounded text-[11px] font-mono transition-colors flex items-center gap-1.5 ${
+                isAudioActive
+                  ? 'bg-amber-950/40 text-amber-300 border border-amber-500/30 font-semibold'
+                  : 'bg-transparent hover:bg-graphite-850 text-graphite-400 hover:text-graphite-200'
+              }`}
+              title={isAudioActive ? 'Mute physics sonification' : 'Hear physics sonification (Web Audio)'}
+            >
+              {isAudioActive ? (
+                <Volume2 className="w-3.5 h-3.5 text-amber-400" />
+              ) : (
+                <VolumeX className="w-3.5 h-3.5 text-graphite-500" />
+              )}
+              <span className="hidden xl:inline">Sonification</span>
+            </button>
+          )}
+
           {onOpenCalibration && (
             <button
               onClick={onOpenCalibration}
@@ -133,10 +157,10 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={onOpenUpload}
             disabled={isProcessing}
             className="focus-ring px-2.5 py-1.5 rounded bg-transparent hover:bg-graphite-850 disabled:opacity-40 text-graphite-300 hover:text-graphite-100 text-[11px] font-mono transition-colors flex items-center gap-1.5"
-            title="Upload custom MP4/MOV clip"
+            title="Upload custom MP4/MOV clip or record webcam"
           >
             <Upload className="w-3.5 h-3.5 text-blue-400/70" />
-            <span className="hidden sm:inline">Upload Clip</span>
+            <span className="hidden sm:inline">Upload / Cam</span>
           </button>
 
           <button

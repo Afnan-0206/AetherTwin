@@ -75,36 +75,48 @@ describe('LIVE NETWORK INTEGRATION SMOKE TESTS (No Mocks)', () => {
   });
 
   // --- 2. LIVE NETWORK REQUESTS TO META API (UNAUTHENTICATED / REJECTED) ---
-  it('3. Real network request to Meta Chat Completions (api.meta.ai) receives live HTTP 401 and falls back safely', async () => {
-    // Real call over internet to https://api.meta.ai/v1/chat/completions
-    const result = await generateMuseSparkDiagnosis(sampleInput, 'unauthenticated_smoke_test_key');
+  it(
+    '3. Real network request to Meta Chat Completions (api.meta.ai) receives live HTTP 401 and falls back safely',
+    async () => {
+      // Real call over internet to https://api.meta.ai/v1/chat/completions
+      const result = await generateMuseSparkDiagnosis(sampleInput, 'unauthenticated_smoke_test_key');
 
-    // Live endpoint returns 401 Unauthorized
-    expect(result.isLiveModel).toBe(false);
-    expect(result.modelUsed).toContain('API error: 401');
-    expect(result.diagnostic).toBeDefined();
-    expect(result.diagnostic.summary).toContain('Verified Damped Pendulum Twin');
-  });
+      // Live endpoint returns 401 Unauthorized
+      expect(result.isLiveModel).toBe(false);
+      expect(result.modelUsed).toContain('API error: 401');
+      expect(result.diagnostic).toBeDefined();
+      expect(result.diagnostic.summary).toContain('Verified Damped Pendulum Twin');
+    },
+    15000
+  );
 
-  it('4. Real network request to Meta Responses API (api.meta.ai) receives live HTTP 401 and throws exact status', async () => {
-    // Real call over internet to https://api.meta.ai/v1/responses
-    await expect(
-      trackBobWithSam3(sampleVideoReq, 'unauthenticated_smoke_test_key')
-    ).rejects.toThrow(/Meta SAM 3.1 API error \(401 Unauthorized\)/);
-  });
+  it(
+    '4. Real network request to Meta Responses API (api.meta.ai) receives live HTTP 401 and throws exact status',
+    async () => {
+      // Real call over internet to https://api.meta.ai/v1/responses
+      await expect(
+        trackBobWithSam3(sampleVideoReq, 'unauthenticated_smoke_test_key')
+      ).rejects.toThrow(/Meta SAM 3.1 API error \(401 Unauthorized\)/);
+    },
+    15000
+  );
 
-  it('5. Route /api/segment handles live 401 network failure with 500 error and sanitized diagnostics', async () => {
-    process.env.MODEL_API_KEY = 'unauthenticated_smoke_test_key';
-    const req = new NextRequest('http://localhost:3000/api/segment', {
-      method: 'POST',
-      body: JSON.stringify(sampleVideoReq)
-    });
+  it(
+    '5. Route /api/segment handles live 401 network failure with 500 error and sanitized diagnostics',
+    async () => {
+      process.env.MODEL_API_KEY = 'unauthenticated_smoke_test_key';
+      const req = new NextRequest('http://localhost:3000/api/segment', {
+        method: 'POST',
+        body: JSON.stringify(sampleVideoReq)
+      });
 
-    const res = await segmentRoute(req);
-    expect(res.status).toBe(500);
-    const data = await res.json();
-    expect(data.error).toContain('Meta SAM 3.1 API error (401 Unauthorized)');
-    // Crucial: Ensure the actual key string is NEVER included in error response
-    expect(JSON.stringify(data)).not.toContain('unauthenticated_smoke_test_key');
-  });
+      const res = await segmentRoute(req);
+      expect(res.status).toBe(500);
+      const data = await res.json();
+      expect(data.error).toContain('Meta SAM 3.1 API error (401 Unauthorized)');
+      // Crucial: Ensure the actual key string is NEVER included in error response
+      expect(JSON.stringify(data)).not.toContain('unauthenticated_smoke_test_key');
+    },
+    15000
+  );
 });

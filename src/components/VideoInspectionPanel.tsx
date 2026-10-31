@@ -17,7 +17,9 @@ import {
   Eye,
   Video,
   Target,
-  Maximize2
+  Maximize2,
+  Ghost,
+  Sparkles
 } from 'lucide-react';
 import { ProvenanceBadge } from './ProvenanceBadge';
 
@@ -35,6 +37,7 @@ interface VideoInspectionPanelProps {
     fps: number;
     durationSec: number;
   };
+  predictedAngleDeg?: number;
 }
 
 export const VideoInspectionPanel: React.FC<VideoInspectionPanelProps> = ({
@@ -45,7 +48,8 @@ export const VideoInspectionPanel: React.FC<VideoInspectionPanelProps> = ({
   onOpenCalibration,
   videoUrl,
   isSyntheticSample,
-  videoMetadata
+  videoMetadata,
+  predictedAngleDeg
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -53,6 +57,7 @@ export const VideoInspectionPanel: React.FC<VideoInspectionPanelProps> = ({
   const [showMask, setShowMask] = useState<boolean>(true);
   const [showTrail, setShowTrail] = useState<boolean>(true);
   const [showBoundingBox, setShowBoundingBox] = useState<boolean>(true);
+  const [showGhostTwin, setShowGhostTwin] = useState<boolean>(true);
 
   const totalFrames = measurements.length;
   const currentMeasurement = measurements[currentFrameIndex] || measurements[0];
@@ -160,7 +165,6 @@ export const VideoInspectionPanel: React.FC<VideoInspectionPanelProps> = ({
     // Standby view if no measurements
     if (!currentMeasurement) {
       const piv = calibration.pivot;
-      // Center crosshair
       ctx.strokeStyle = 'rgba(59, 130, 246, 0.4)';
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -182,6 +186,7 @@ export const VideoInspectionPanel: React.FC<VideoInspectionPanelProps> = ({
 
     const pivot = currentMeasurement.pivot || calibration.pivot;
     const bob = currentMeasurement.bobCentroid;
+    const armLenPx = calibration.arcRadiusPixels || Math.hypot(bob.x - pivot.x, bob.y - pivot.y) || 250;
 
     // 2. Historical kinematic motion trail
     if (showTrail && measurements.length > 0) {
@@ -200,7 +205,6 @@ export const VideoInspectionPanel: React.FC<VideoInspectionPanelProps> = ({
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Position dots along trail
       for (let i = startIdx; i <= currentFrameIndex; i++) {
         const pt = measurements[i].bobCentroid;
         const alpha = (i - startIdx) / trailWindow;
@@ -211,7 +215,7 @@ export const VideoInspectionPanel: React.FC<VideoInspectionPanelProps> = ({
       }
     }
 
-    // 3. Physical rod
+    // 3. Physical rod (Observed)
     ctx.beginPath();
     ctx.moveTo(pivot.x, pivot.y);
     ctx.lineTo(bob.x, bob.y);
@@ -231,7 +235,7 @@ export const VideoInspectionPanel: React.FC<VideoInspectionPanelProps> = ({
 
     // 5. Angular arc
     const arcRadius = 45;
-    const startAngle = Math.PI / 2; // downward vertical
+    const startAngle = Math.PI / 2;
     const endAngle = Math.PI / 2 - currentMeasurement.angleRad;
     ctx.beginPath();
     ctx.arc(
@@ -249,7 +253,7 @@ export const VideoInspectionPanel: React.FC<VideoInspectionPanelProps> = ({
     if (showMask && currentMeasurement.maskSvgPath) {
       ctx.save();
       const path2D = new Path2D(currentMeasurement.maskSvgPath);
-      ctx.fillStyle = 'rgba(139, 92, 246, 0.25)'; // Restrained violet mask
+      ctx.fillStyle = 'rgba(139, 92, 246, 0.25)';
       ctx.strokeStyle = 'rgba(139, 92, 246, 0.7)';
       ctx.lineWidth = 1.5;
       ctx.fill(path2D);
@@ -264,7 +268,6 @@ export const VideoInspectionPanel: React.FC<VideoInspectionPanelProps> = ({
       ctx.lineWidth = 1;
       ctx.strokeRect(box.x, box.y, box.width, box.height);
 
-      // Label tag
       ctx.fillStyle = 'rgba(11, 13, 19, 0.9)';
       ctx.fillRect(box.x, box.y - 15, 84, 14);
       ctx.strokeStyle = '#10b981';
@@ -279,7 +282,7 @@ export const VideoInspectionPanel: React.FC<VideoInspectionPanelProps> = ({
       );
     }
 
-    // 8. Bob Centroid
+    // 8. Bob Centroid (Observed)
     if (isSyntheticSample) {
       const grad = ctx.createRadialGradient(
         bob.x - 4,
@@ -308,7 +311,75 @@ export const VideoInspectionPanel: React.FC<VideoInspectionPanelProps> = ({
       ctx.fill();
     }
 
-    // 9. Pivot bearing
+    // 9. "GHOST TWIN" SPATIAL VIDEO OVERLAY (Simulated vs Real)
+    if (showGhostTwin && predictedAngleDeg !== undefined) {
+      const ghostRad = (predictedAngleDeg * Math.PI) / 180;
+      const ghostX = pivot.x + armLenPx * Math.sin(ghostRad);
+      const ghostY = pivot.y + armLenPx * Math.cos(ghostRad);
+
+      // Ghost rod (dashed cyan)
+      ctx.beginPath();
+      ctx.moveTo(pivot.x, pivot.y);
+      ctx.lineTo(ghostX, ghostY);
+      ctx.strokeStyle = 'rgba(6, 182, 212, 0.75)';
+      ctx.lineWidth = 1.8;
+      ctx.setLineDash([4, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Ghost bob (glowing cyan outline & core)
+      ctx.beginPath();
+      ctx.arc(ghostX, ghostY, 14, 0, 2 * Math.PI);
+      ctx.fillStyle = 'rgba(6, 182, 212, 0.2)';
+      ctx.fill();
+      ctx.strokeStyle = '#06b6d4';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Ghost center pip
+      ctx.beginPath();
+      ctx.arc(ghostX, ghostY, 3, 0, 2 * Math.PI);
+      ctx.fillStyle = '#22d3ee';
+      ctx.fill();
+
+      // Spatial residual line connecting observed bob to ghost twin
+      const dxSpatial = ghostX - bob.x;
+      const dySpatial = ghostY - bob.y;
+      const distPx = Math.hypot(dxSpatial, dySpatial);
+
+      if (distPx > 2.0) {
+        ctx.beginPath();
+        ctx.moveTo(bob.x, bob.y);
+        ctx.lineTo(ghostX, ghostY);
+        ctx.strokeStyle = 'rgba(244, 63, 94, 0.7)';
+        ctx.lineWidth = 1.2;
+        ctx.setLineDash([2, 2]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Label spatial difference
+        ctx.fillStyle = '#fb7185';
+        ctx.font = '8px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(
+          `Δr: ${distPx.toFixed(1)}px`,
+          (bob.x + ghostX) / 2,
+          (bob.y + ghostY) / 2 - 4
+        );
+      }
+
+      // Ghost twin tag
+      ctx.fillStyle = 'rgba(8, 51, 68, 0.9)';
+      ctx.fillRect(ghostX - 28, ghostY + 16, 56, 13);
+      ctx.strokeStyle = '#06b6d4';
+      ctx.strokeRect(ghostX - 28, ghostY + 16, 56, 13);
+      ctx.fillStyle = '#22d3ee';
+      ctx.font = '8px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('TWIN [RK4]', ghostX, ghostY + 25);
+    }
+
+    // 10. Pivot bearing
     ctx.beginPath();
     ctx.arc(pivot.x, pivot.y, 4, 0, 2 * Math.PI);
     ctx.fillStyle = '#3b82f6';
@@ -329,12 +400,15 @@ export const VideoInspectionPanel: React.FC<VideoInspectionPanelProps> = ({
   }, [
     currentMeasurement,
     calibration.pivot,
+    calibration.arcRadiusPixels,
     currentFrameIndex,
     isSyntheticSample,
     measurements,
     showBoundingBox,
     showMask,
     showTrail,
+    showGhostTwin,
+    predictedAngleDeg,
     width,
     height,
     videoUrl
@@ -402,6 +476,14 @@ export const VideoInspectionPanel: React.FC<VideoInspectionPanelProps> = ({
                 {currentMeasurement.angleDeg.toFixed(2)}°
               </span>
             </div>
+            {predictedAngleDeg !== undefined && (
+              <div className="flex items-center justify-between gap-4 text-graphite-400 text-[10px]">
+                <span>TWIN PREDICTED θ</span>
+                <span className="text-cyan-400 font-semibold tabular-nums">
+                  {predictedAngleDeg.toFixed(2)}°
+                </span>
+              </div>
+            )}
             <div className="flex items-center justify-between gap-4 text-graphite-400 text-[10px]">
               <span>BOB CENTROID</span>
               <span className="text-graphite-300 tabular-nums">
@@ -420,6 +502,18 @@ export const VideoInspectionPanel: React.FC<VideoInspectionPanelProps> = ({
 
         {/* Layer Visibility Chips (Top-Right) */}
         <div className="absolute top-3 right-3 flex flex-col gap-1 font-mono text-[10px]">
+          <button
+            onClick={() => setShowGhostTwin(!showGhostTwin)}
+            className={`px-2 py-0.5 rounded border transition flex items-center gap-1 ${
+              showGhostTwin
+                ? 'bg-cyan-950/70 border-cyan-500/50 text-cyan-300'
+                : 'bg-graphite-900/80 border-graphite-800 text-graphite-500'
+            }`}
+            title="Toggle Ghost Digital Twin overlay on video"
+          >
+            <Ghost className="w-2.5 h-2.5 text-cyan-400" />
+            <span>GHOST TWIN</span>
+          </button>
           <button
             onClick={() => setShowMask(!showMask)}
             className={`px-2 py-0.5 rounded border transition flex items-center gap-1 ${

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   TrajectoryComparisonPoint,
   ValidationMetrics,
@@ -24,7 +24,10 @@ import {
   FileCode,
   FileText,
   CheckCircle,
-  Copy
+  Copy,
+  Radio,
+  Flame,
+  Waves
 } from 'lucide-react';
 import { ProvenanceBadge } from './ProvenanceBadge';
 import {
@@ -33,6 +36,8 @@ import {
   generateVerificationCertificateMarkdown,
   downloadTextFile
 } from '@/lib/export/exportUtils';
+import { computeSpectralAnalysis } from '@/lib/physics/fft';
+import { simulateDoublePendulumChaos } from '@/lib/physics/doublePendulum';
 
 interface MetricsDiagnosticsPanelProps {
   comparisonPoints: TrajectoryComparisonPoint[];
@@ -63,9 +68,41 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
   calibration,
   onSeekFrame
 }) => {
-  const [activeTab, setActiveTab] = useState<'charts' | 'phase' | 'energy' | 'diagnostics' | 'provenance' | 'export'>('charts');
+  const [activeTab, setActiveTab] = useState<
+    'charts' | 'phase' | 'energy' | 'spectrum' | 'chaos' | 'diagnostics' | 'export' | 'provenance'
+  >('charts');
   const [hoveredPoint, setHoveredPoint] = useState<TrajectoryComparisonPoint | null>(null);
   const [copiedType, setCopiedType] = useState<string | null>(null);
+
+  // Compute Fast Fourier Transform / Spectral Analysis
+  const spectralResult = useMemo(() => {
+    if (comparisonPoints.length < 8) return null;
+    const meas = comparisonPoints.map((p) => p.measuredAngleDeg);
+    const pred = comparisonPoints.map((p) => p.predictedAngleDeg);
+    return computeSpectralAnalysis(meas, pred, 30);
+  }, [comparisonPoints]);
+
+  // Compute Double Pendulum Chaos & Lyapunov Horizon
+  const chaosResult = useMemo(() => {
+    const l = fittedParameters?.length ?? 0.5;
+    const g = fittedParameters?.gravity ?? (fittedParameters ? fittedParameters.omega0Sq * l : 9.81);
+    const th0 = fittedParameters?.initialAngle ?? 0.65;
+    return simulateDoublePendulumChaos(
+      th0,
+      th0 * 0.85,
+      {
+        l1: l / 2,
+        l2: l / 2,
+        m1: 0.5,
+        m2: 0.5,
+        gravity: g,
+        damping1: (fittedParameters?.damping ?? 0.1) * 0.35,
+        damping2: (fittedParameters?.damping ?? 0.1) * 0.35
+      },
+      6.0,
+      30
+    );
+  }, [fittedParameters]);
 
   if (comparisonPoints.length === 0 || !metrics) {
     return (
@@ -276,6 +313,28 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
             <span>ENERGY</span>
           </button>
           <button
+            onClick={() => setActiveTab('spectrum')}
+            className={`px-2 py-0.5 rounded transition flex items-center gap-1 ${
+              activeTab === 'spectrum'
+                ? 'bg-teal-950/40 text-teal-300 border border-teal-500/30 font-semibold'
+                : 'text-graphite-400 hover:text-graphite-200'
+            }`}
+          >
+            <Waves className="w-2.5 h-2.5 text-teal-400" />
+            <span>FFT</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('chaos')}
+            className={`px-2 py-0.5 rounded transition flex items-center gap-1 ${
+              activeTab === 'chaos'
+                ? 'bg-purple-950/40 text-purple-300 border border-purple-500/30 font-semibold'
+                : 'text-graphite-400 hover:text-graphite-200'
+            }`}
+          >
+            <Flame className="w-2.5 h-2.5 text-amber-400" />
+            <span>CHAOS</span>
+          </button>
+          <button
             onClick={() => setActiveTab('diagnostics')}
             className={`px-2 py-0.5 rounded transition flex items-center gap-1 ${
               activeTab === 'diagnostics'
@@ -431,14 +490,6 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
                   viewBox={`0 0 ${svgWidth} ${svgHeight}`}
                   className="w-full h-full select-none"
                 >
-                  <defs>
-                    <linearGradient id="splitGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.25" />
-                      <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.0" />
-                    </linearGradient>
-                  </defs>
-
-                  {/* 70% Train Shading */}
                   <rect
                     x={padLeft}
                     y={padTop}
@@ -446,7 +497,6 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
                     height={plotH}
                     fill="rgba(16, 185, 129, 0.04)"
                   />
-                  {/* 30% Holdout Shading */}
                   <rect
                     x={splitX}
                     y={padTop}
@@ -455,7 +505,6 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
                     fill="rgba(245, 158, 11, 0.05)"
                   />
 
-                  {/* Grid Lines */}
                   {[0, 0.25, 0.5, 0.75, 1.0].map((frac) => {
                     const y = padTop + plotH * frac;
                     const val = maxAngle - frac * angleRange;
@@ -483,7 +532,6 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
                     );
                   })}
 
-                  {/* Zero axis */}
                   {minAngle < 0 && maxAngle > 0 && (
                     <line
                       x1={padLeft}
@@ -496,7 +544,6 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
                     />
                   )}
 
-                  {/* 70/30 Divider */}
                   <line
                     x1={splitX}
                     y1={padTop}
@@ -529,7 +576,6 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
                     HOLDOUT 30%
                   </text>
 
-                  {/* Lines */}
                   <path
                     d={baselinePath}
                     fill="none"
@@ -552,7 +598,6 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
                     strokeWidth="2"
                   />
 
-                  {/* Interactive Scrub Hover Points */}
                   {comparisonPoints.map((p, i) => {
                     const x = getX(p.timestamp);
                     const y = getY(p.measuredAngleDeg);
@@ -575,7 +620,6 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
               </div>
             </div>
 
-            {/* Residual Plot */}
             <div className="rounded bg-graphite-850 border border-graphite-800 p-2.5">
               <div className="flex items-center justify-between mb-1.5 font-mono text-[10px]">
                 <span className="text-graphite-300 font-semibold">
@@ -639,7 +683,6 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
 
             <div className="relative w-full aspect-[620/220] max-h-[260px]">
               <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-full select-none">
-                {/* Background & Origin Crosshairs */}
                 <line
                   x1={getPhaseX(0)}
                   y1={padTop}
@@ -658,8 +701,6 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
                   strokeWidth="1"
                   strokeDasharray="2,2"
                 />
-
-                {/* Axis Labels */}
                 <text
                   x={padLeft + plotW - 10}
                   y={getPhaseY(0) - 5}
@@ -680,7 +721,6 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
                   +ω (deg/s)
                 </text>
 
-                {/* Phase trajectories */}
                 <path
                   d={phaseMeasuredPath}
                   fill="none"
@@ -694,8 +734,6 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
                   stroke="#818cf8"
                   strokeWidth="2"
                 />
-
-                {/* Origin Attractor Point */}
                 <circle
                   cx={getPhaseX(0)}
                   cy={getPhaseY(0)}
@@ -729,7 +767,6 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
 
             <div className="relative w-full aspect-[620/220] max-h-[260px]">
               <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-full select-none">
-                {/* Grid */}
                 {[0, 0.5, 1.0].map((frac) => (
                   <line
                     key={frac}
@@ -793,7 +830,255 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
           </div>
         )}
 
-        {/* TAB 4: MUSE SPARK AI DIAGNOSTICS */}
+        {/* TAB 4: FAST FOURIER TRANSFORM (FFT SPECTRUM) */}
+        {activeTab === 'spectrum' && (
+          <div className="rounded bg-graphite-850 border border-graphite-800 p-3 space-y-2.5">
+            <div className="flex items-center justify-between font-mono text-[10px]">
+              <div className="flex items-center gap-2">
+                <Waves className="w-3.5 h-3.5 text-teal-400" />
+                <span className="text-graphite-200 font-semibold">
+                  FAST FOURIER TRANSFORM // SPECTRAL POWER DENSITY
+                </span>
+              </div>
+              {spectralResult && (
+                <span className="text-teal-300 font-semibold">
+                  Resonant Peak: f₀ = {spectralResult.fundamentalFrequencyHz} Hz
+                </span>
+              )}
+            </div>
+
+            {spectralResult && (
+              <>
+                <div className="relative w-full aspect-[620/200] max-h-[230px]">
+                  <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-full select-none">
+                    {/* Frequency spectrum bars / curve */}
+                    {(() => {
+                      const maxFreq = Math.min(6.0, spectralResult.nyquistHz);
+                      let maxMag = 0.1;
+                      spectralResult.spectrum.forEach((s) => {
+                        if (s.frequencyHz <= maxFreq) {
+                          maxMag = Math.max(maxMag, s.measuredMagnitude, s.predictedMagnitude);
+                        }
+                      });
+                      maxMag *= 1.25;
+
+                      const getFx = (f: number) => padLeft + (f / maxFreq) * plotW;
+                      const getFy = (m: number) => padTop + plotH - (m / maxMag) * plotH;
+
+                      let measSpecPath = '';
+                      let predSpecPath = '';
+
+                      spectralResult.spectrum.forEach((pt, i) => {
+                        if (pt.frequencyHz > maxFreq) return;
+                        const x = getFx(pt.frequencyHz);
+                        const yM = getFy(pt.measuredMagnitude);
+                        const yP = getFy(pt.predictedMagnitude);
+
+                        if (i === 0) {
+                          measSpecPath += `M ${x} ${yM}`;
+                          predSpecPath += `M ${x} ${yP}`;
+                        } else {
+                          measSpecPath += ` L ${x} ${yM}`;
+                          predSpecPath += ` L ${x} ${yP}`;
+                        }
+                      });
+
+                      return (
+                        <>
+                          {/* Grid */}
+                          {[1, 2, 3, 4, 5].map((hz) => (
+                            <g key={hz}>
+                              <line
+                                x1={getFx(hz)}
+                                y1={padTop}
+                                x2={getFx(hz)}
+                                y2={padTop + plotH}
+                                stroke="rgba(148, 163, 184, 0.12)"
+                                strokeWidth="1"
+                              />
+                              <text
+                                x={getFx(hz)}
+                                y={padTop + plotH + 12}
+                                fill="#64748b"
+                                fontSize="8"
+                                fontFamily="monospace"
+                                textAnchor="middle"
+                              >
+                                {hz} Hz
+                              </text>
+                            </g>
+                          ))}
+
+                          {/* Spectral Curves */}
+                          <path
+                            d={measSpecPath}
+                            fill="none"
+                            stroke="#38bdf8"
+                            strokeWidth="1.5"
+                            opacity="0.8"
+                          />
+                          <path
+                            d={predSpecPath}
+                            fill="none"
+                            stroke="#14b8a6"
+                            strokeWidth="2.5"
+                          />
+
+                          {/* Fundamental Peak Indicator */}
+                          <line
+                            x1={getFx(spectralResult.fundamentalFrequencyHz)}
+                            y1={padTop}
+                            x2={getFx(spectralResult.fundamentalFrequencyHz)}
+                            y2={padTop + plotH}
+                            stroke="#14b8a6"
+                            strokeWidth="1.5"
+                            strokeDasharray="2,2"
+                          />
+                        </>
+                      );
+                    })()}
+                  </svg>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 font-mono text-[10px] pt-1 border-t border-graphite-800">
+                  <div className="p-2 rounded bg-graphite-800">
+                    <span className="text-graphite-400 block text-[9px]">FUNDAMENTAL f₀</span>
+                    <span className="text-teal-300 font-bold text-xs">
+                      {spectralResult.fundamentalFrequencyHz} Hz
+                    </span>
+                    <span className="text-graphite-500 block text-[9px]">
+                      Period T = {(1 / spectralResult.fundamentalFrequencyHz).toFixed(2)}s
+                    </span>
+                  </div>
+                  <div className="p-2 rounded bg-graphite-800">
+                    <span className="text-graphite-400 block text-[9px]">NON-LINEAR HARMONIC</span>
+                    <span className="text-cyan-300 font-bold text-xs">
+                      {spectralResult.dominantHarmonicHz ? `${spectralResult.dominantHarmonicHz} Hz` : 'Sub-threshold'}
+                    </span>
+                    <span className="text-graphite-500 block text-[9px]">
+                      Odd overtone 3f₀
+                    </span>
+                  </div>
+                  <div className="p-2 rounded bg-graphite-800">
+                    <span className="text-graphite-400 block text-[9px]">HARMONIC RATIO</span>
+                    <span className="text-amber-300 font-bold text-xs">
+                      {(spectralResult.harmonicRatio * 100).toFixed(1)}%
+                    </span>
+                    <span className="text-graphite-500 block text-[9px]">
+                      sin(θ) non-linearity
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* TAB 5: DOUBLE PENDULUM CHAOS & LYAPUNOV HORIZON */}
+        {activeTab === 'chaos' && (
+          <div className="rounded bg-graphite-850 border border-graphite-800 p-3 space-y-2.5 font-mono">
+            <div className="flex items-center justify-between text-[10px]">
+              <div className="flex items-center gap-2">
+                <Flame className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-graphite-200 font-semibold">
+                  2-DOF DOUBLE PENDULUM CHAOS // LYAPUNOV HORIZON
+                </span>
+              </div>
+              <span className="text-purple-300 font-semibold">
+                Horizon: {chaosResult.lyapunovHorizonSeconds}s
+              </span>
+            </div>
+
+            <div className="relative w-full aspect-[620/190] max-h-[220px]">
+              <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-full select-none">
+                {(() => {
+                  const maxT = 6.0;
+                  const maxDiv = 1.6; // ~90 degrees
+                  const getCx = (t: number) => padLeft + (t / maxT) * plotW;
+                  const getCy = (div: number) => padTop + plotH - (Math.min(maxDiv, div) / maxDiv) * plotH;
+
+                  const horizonX = getCx(chaosResult.lyapunovHorizonSeconds);
+
+                  let divPath = '';
+                  chaosResult.statesPrimary.forEach((st, i) => {
+                    const x = getCx(st.t);
+                    const y = getCy(st.divergenceRad ?? 0);
+                    if (i === 0) divPath += `M ${x} ${y}`;
+                    else divPath += ` L ${x} ${y}`;
+                  });
+
+                  return (
+                    <>
+                      {/* Chaos Zone Shading */}
+                      <rect
+                        x={horizonX}
+                        y={padTop}
+                        width={padLeft + plotW - horizonX}
+                        height={plotH}
+                        fill="rgba(168, 85, 247, 0.08)"
+                      />
+
+                      {/* 5-degree divergence threshold line */}
+                      <line
+                        x1={padLeft}
+                        y1={getCy(0.087)}
+                        x2={padLeft + plotW}
+                        y2={getCy(0.087)}
+                        stroke="rgba(244, 63, 94, 0.5)"
+                        strokeWidth="1"
+                        strokeDasharray="3,3"
+                      />
+                      <text
+                        x={padLeft + 6}
+                        y={getCy(0.087) - 4}
+                        fill="#f43f5e"
+                        fontSize="8"
+                        fontFamily="monospace"
+                      >
+                        5.0° Divergence Threshold
+                      </text>
+
+                      {/* Lyapunov Horizon Marker */}
+                      <line
+                        x1={horizonX}
+                        y1={padTop}
+                        x2={horizonX}
+                        y2={padTop + plotH}
+                        stroke="#a855f7"
+                        strokeWidth="1.8"
+                        strokeDasharray="2,2"
+                      />
+                      <text
+                        x={horizonX + 4}
+                        y={padTop + 14}
+                        fill="#c084fc"
+                        fontSize="8"
+                        fontFamily="monospace"
+                        fontWeight="bold"
+                      >
+                        LYAPUNOV HORIZON ({chaosResult.lyapunovHorizonSeconds}s)
+                      </text>
+
+                      {/* Divergence Curve */}
+                      <path
+                        d={divPath}
+                        fill="none"
+                        stroke="#e879f9"
+                        strokeWidth="2"
+                      />
+                    </>
+                  );
+                })()}
+              </svg>
+            </div>
+
+            <div className="p-2.5 rounded bg-purple-950/20 border border-purple-500/20 text-[10px] text-purple-200/90 leading-relaxed">
+              <strong>The Mathematical Horizon of Digital Twins:</strong> With a microscopic perturbation (&delta;₀ = 10⁻⁵ rad), the deterministic twin stays faithful until <span className="text-amber-300 font-bold">{chaosResult.lyapunovHorizonSeconds}s</span>, after which sensitive dependence on initial conditions produces exponential divergence (|&Delta;&theta;| ~ e^({chaosResult.maxLyapunovExponent}·t)).
+            </div>
+          </div>
+        )}
+
+        {/* TAB 6: MUSE SPARK AI DIAGNOSTICS */}
         {activeTab === 'diagnostics' && (
           <div className="space-y-3 font-mono text-xs">
             <div className="p-2.5 rounded bg-amber-950/20 border border-amber-500/30 flex items-start gap-2.5">
@@ -880,7 +1165,7 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
           </div>
         )}
 
-        {/* TAB 5: EXPORT & CERTIFICATE */}
+        {/* TAB 7: EXPORT & CERTIFICATE */}
         {activeTab === 'export' && (
           <div className="space-y-3 font-mono text-xs">
             <div className="p-3 rounded bg-graphite-850 border border-graphite-800">
@@ -935,7 +1220,6 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
               </div>
             </div>
 
-            {/* Quick Copy Snippet */}
             {fittedParameters && (
               <div className="p-3 rounded bg-graphite-850 border border-graphite-800 space-y-2">
                 <div className="flex items-center justify-between text-[10px]">
@@ -966,7 +1250,7 @@ export const MetricsDiagnosticsPanel: React.FC<MetricsDiagnosticsPanelProps> = (
           </div>
         )}
 
-        {/* TAB 6: PROVENANCE LOG */}
+        {/* TAB 8: PROVENANCE LOG */}
         {activeTab === 'provenance' && (
           <div className="space-y-2 font-mono text-xs">
             <div className="text-[10px] text-graphite-400 pb-1.5 border-b border-graphite-800">
