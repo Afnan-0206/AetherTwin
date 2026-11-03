@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { trackBobWithSam3, VideoSegmentationRequest } from '@/lib/meta/samClient';
 
-export const runtime = 'nodejs';
+export const runtime = 'edge';
 // Allow larger payloads for short video base64
 export const dynamic = 'force-dynamic';
 

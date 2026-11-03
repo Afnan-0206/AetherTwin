@@ -3,6 +3,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-14.2.18-black?logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![Vitest](https://img.shields.io/badge/Vitest-64%20Passed-brightgreen?logo=vitest)](https://vitest.dev/)
+[![Cloudflare Pages](https://img.shields.io/badge/Deploy-Cloudflare%20Pages-F38020?logo=cloudflare)](docs/CLOUDFLARE_DEPLOYMENT.md)
 [![Meta SAM 3.1](https://img.shields.io/badge/Meta%20AI-SAM%203.1-0668E1?logo=meta)](https://ai.meta.com/)
 [![Meta Muse Spark](https://img.shields.io/badge/Meta%20AI-Muse%20Spark%201.3-E10668?logo=meta)](https://ai.meta.com/)
 [![ROS 2](https://img.shields.io/badge/Robotics-ROS%202%20Humble-22314E?logo=ros)](https://www.ros.org/)
@@ -253,7 +254,29 @@ Compiles with 100% static and dynamic optimization.
 ```bash
 npm test
 ```
-Executes all **13 Vitest test suites (59 passing tests)** covering the Riccati solver, LQR control, hardware exporters, FFT analysis, chaos horizons, 70/30 holdout validation, and live network handshakes.
+Executes all **14 Vitest test suites (64 passing tests)** covering the Riccati solver, LQR control, hardware exporters, FFT analysis, chaos horizons, 70/30 holdout validation, and live network handshakes.
+
+---
+
+## Deploying to Cloudflare Pages
+
+AetherTwin is fully configured for zero-configuration deployment to **Cloudflare Pages** utilizing Cloudflare's global edge network and V8 Edge Runtime:
+
+1. **Connect to Cloudflare Pages**: In the Cloudflare Dashboard, select **Workers & Pages** > **Create application** > **Connect to Git** (`AetherTwin`).
+2. **Build Settings**:
+   - **Framework Preset**: `Next.js`
+   - **Build Command**: `npx @cloudflare/next-on-pages` (or `npm run pages:build`)
+   - **Build Output Directory**: `.vercel/output/static`
+3. **Environment Variables**:
+   - `NODE_VERSION`: `20`
+   - `MODEL_API_KEY`: *(Optional)* Your Meta AI API key.
+4. **Deploy via CLI**:
+   ```bash
+   npx @cloudflare/next-on-pages
+   npx wrangler pages deploy .vercel/output/static --project-name=aethertwin
+   ```
+
+See the complete guide in [`docs/CLOUDFLARE_DEPLOYMENT.md`](docs/CLOUDFLARE_DEPLOYMENT.md).
 
 ---
 

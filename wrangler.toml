@@ -1,0 +1,10 @@
+# Cloudflare Pages / Workers Configuration for AetherTwin
+name = "aethertwin"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = ".vercel/output/static"
+
+[vars]
+# Non-sensitive runtime variables
+NODE_VERSION = "20"
+

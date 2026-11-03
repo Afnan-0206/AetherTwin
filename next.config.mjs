@@ -1,7 +1,24 @@
 /** @type {import('next').NextConfig} */
+const isStaticExport = process.env.NEXT_EXPORT === 'true';
+
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@meta-sam/parser'],
+  ...(isStaticExport
+    ? { output: 'export' }
+    : {
+        headers: async () => [
+          {
+            source: '/(.*)',
+            headers: [
+              { key: 'X-Content-Type-Options', value: 'nosniff' },
+              { key: 'X-Frame-Options', value: 'DENY' },
+              { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+              { key: 'Permissions-Policy', value: 'camera=(self), microphone=(self)' }
+            ]
+          }
+        ]
+      })
 };
 
 export default nextConfig;
