@@ -1,13 +1,22 @@
 # AetherTwin — Neural-to-Physical Digital Twin with LQR Optimal Control & Hardware Edge Synthesis
 
+<div align="center">
+
 [![Next.js](https://img.shields.io/badge/Next.js-14.2.18-black?logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![Vitest](https://img.shields.io/badge/Vitest-64%20Passed-brightgreen?logo=vitest)](https://vitest.dev/)
 [![Cloudflare Pages](https://img.shields.io/badge/Deploy-Cloudflare%20Pages-F38020?logo=cloudflare)](docs/CLOUDFLARE_DEPLOYMENT.md)
+[![Architecture diagram](https://gitdiagram.com/diagram-badge.svg)](https://gitdiagram.com/afnan-0206/aethertwin?utm_source=readme&utm_medium=badge)
 [![Meta SAM 3.1](https://img.shields.io/badge/Meta%20AI-SAM%203.1-0668E1?logo=meta)](https://ai.meta.com/)
 [![Meta Muse Spark](https://img.shields.io/badge/Meta%20AI-Muse%20Spark%201.3-E10668?logo=meta)](https://ai.meta.com/)
 [![ROS 2](https://img.shields.io/badge/Robotics-ROS%202%20Humble-22314E?logo=ros)](https://www.ros.org/)
 [![Arduino](https://img.shields.io/badge/Embedded-Arduino%20C%2B%2B-00979D?logo=arduino)](https://www.arduino.cc/)
+
+**From real-world video to verifiable differential simulation, optimal state-space control, and deployed edge robotics.**
+
+[Live Architecture Diagram](https://gitdiagram.com/afnan-0206/aethertwin?utm_source=readme&utm_medium=badge) • [Cloudflare Deployment Guide](docs/CLOUDFLARE_DEPLOYMENT.md) • [Hackathon Submission Blueprint](APPLICATION.md)
+
+</div>
 
 > **Meta x Cerebral Valley "Push the Frontier" Hackathon:**  
 > *"Use Meta's models to tackle challenges in software, robotics, manufacturing, energy, materials and beyond. Give a machine a new capability, accelerate a scientific experiment, or unlock a better way to understand and control a physical system. Show us what becomes possible when these models meet the real world."*
@@ -51,6 +60,16 @@ flowchart TD
         Gains --> LiveTwin["Interactive Twin Canvas (Rocket Booster TVC & Wind Blasts)"]
     end
 ```
+
+---
+
+## Visual Architecture & Interactive Map
+
+Explore the full codebase architecture and component dependency graph interactively on GitDiagram:
+
+[![Interactive Architecture Diagram](https://gitdiagram.com/diagram-badge.svg)](https://gitdiagram.com/afnan-0206/aethertwin?utm_source=readme&utm_medium=badge)
+
+*Click the badge above to inspect the complete AST dependency flow, API routes, physics solvers, and UI components in real time.*
 
 ---
 
@@ -110,32 +129,32 @@ AetherTwin provides 8 validated physical presets spanning critical engineering f
 7. **Empirical Video Twin:** Real video tracking baseline with camera calibration.
 8. **Synthetic Reference Benchmark:** Seeded ground-truth planar pendulum with zero data leakage.
 
-### 3. Hardware Edge Exporters (`src/lib/export/exportUtils.ts`)
+### 6. Hardware Edge Exporters (`src/lib/export/exportUtils.ts`)
 - **ROS 2 Humble / Iron**: Generates ready-to-run Python nodes implementing `rclpy` publishers and subscribers for `/joint_states` and `/cmd_force` at 100 Hz.
 - **Embedded Arduino / C++ Firmware**: Generates interrupt-driven 100 Hz firmware with quadrature encoder angle decoding, LQR gain dot-product calculation, and PWM motor driver direction control.
 - **MATLAB / Simulink**: Generates full `.m` control scripts with state-space initialization, continuous Riccati derivation, and closed-loop step response verification.
 - **Scientific Verification Certificate**: One-click Markdown certificate with SHA-256 cryptographic hashes verifying input data integrity, parameter bounds, and holdout error metrics.
 
-### 4. Deterministic Runge-Kutta 4th-Order (RK4) Solver
+### 7. Deterministic Runge-Kutta 4th-Order (RK4) Solver
 - Sub-stepped ($\Delta t \le 0.002$s) numerical integration preserving symplectic stability:
   $$\theta''(t) = -\omega_0^2 \sin(\theta(t)) - c_1 \theta'(t) - c_2 |\theta'(t)|\theta'(t)$$
 - Energy conservation verification: Total mechanical energy $E = \frac{1}{2}m L^2 \dot{\theta}^2 + mgL(1 - \cos\theta)$ remains constant in undamped regimes ($< 0.05\%$ drift over 2s).
 
-### 5. Strict 70% / 30% Train-Holdout Separation
+### 8. Strict 70% / 30% Train-Holdout Separation
 - The first 70% of timestamps are used for parameter optimization $(\omega_0^2 = g/L, c_1, c_2, \theta_0, \omega_0)$.
 - The final 30% of frames are **strictly held out** and never seen during fitting.
 - Evaluates Mean Absolute Error (MAE) and Root Mean Squared Error (RMSE) against a constant angular velocity persistence baseline, typically delivering **90%–98% error reduction**.
 
-### 6. Meta AI Model Integrations
+### 9. Meta AI Model Integrations
 - **Meta SAM 3.1 (`sam-3.1`)**: Employs `@meta-sam/parser` to decode point/bbox object prompts and streaming responses for video segmentation, mask extraction, and centroid telemetry. Includes fallback to client-side Lucas-Kanade optical flow.
 - **Meta Muse Spark 1.3 (`muse-spark-1.3`)**: Server-side physical reasoning engine providing structured assessments of damping regimes, quality classifications, and physical hypotheses.
 - **Interactive Physical Copilot**: Real-time Q&A assistant in the diagnostics panel allowing users to interrogate control authority, wind disturbance rejection, Fourier harmonics, and damping regimes.
 
-### 7. Fast Fourier Transform & Deterministic Chaos
+### 10. Fast Fourier Transform & Deterministic Chaos
 - **FFT Spectral Power Analysis**: Hanning-windowed discrete Fourier transform isolating fundamental resonance $f_0$ and quantifying Total Harmonic Distortion (THD) resulting from non-linear Duffing terms ($\sin\theta \approx \theta - \theta^3/6$).
 - **Double Pendulum Chaos Engine**: Simulates dual-link Hamiltonian dynamics, computing maximal Lyapunov exponents ($\lambda$) and identifying the **Lyapunov Horizon** where sensitivity to initial conditions ($10^{-4}$ rad) exceeds $10^\circ$.
 
-### 8. Live Sonification & Scientific Provenance
+### 11. Live Sonification & Scientific Provenance
 - **Web Audio API Sonification**: Generates continuous acoustic feedback where angular velocity maps to pitch frequency and mechanical kinetic energy modulates gain amplitude.
 - **Tripartite Provenance**: Rigorously categorizes all telemetry into:
   - 🔵 **OBSERVED**: Raw video pixels, optical centroids, frame timestamps.
@@ -144,15 +163,17 @@ AetherTwin provides 8 validated physical presets spanning critical engineering f
 
 ---
 
-## Architecture
+## Architecture & Directory Layout
 
 ```
 AetherTwin/
+├── docs/
+│   └── CLOUDFLARE_DEPLOYMENT.md       # Zero-configuration Cloudflare Pages deployment guide
 ├── src/
 │   ├── app/
 │   │   ├── api/
-│   │   │   ├── segment/route.ts       # Meta SAM 3.1 streaming route
-│   │   │   └── diagnose/route.ts      # Meta Muse Spark 1.3 structured output route
+│   │   │   ├── segment/route.ts       # Meta SAM 3.1 streaming route (Edge Runtime)
+│   │   │   └── diagnose/route.ts      # Meta Muse Spark 1.3 structured output route (Edge Runtime)
 │   │   ├── globals.css                # Dark graphite theme & grid lines
 │   │   ├── layout.tsx                 # App layout & SEO metadata
 │   │   └── page.tsx                   # 3-Region Desktop Workbench & Pipeline Coordinator
@@ -165,10 +186,15 @@ AetherTwin/
 │   │   ├── MetricsDiagnosticsPanel.tsx# Trajectory, phase, FFT, LQR control, copilot
 │   │   ├── CalibrationModal.tsx       # Pivot coordinates & physical scale calibration
 │   │   ├── UploadModal.tsx            # Custom video upload & webcam recording
+│   │   ├── MetaArchitectureModal.tsx  # Dual-model Meta SAM 3.1 & Llama architecture
+│   │   ├── EdgeFirmwareModal.tsx      # 100 Hz serial terminal & WebSerial USB
+│   │   ├── GuidedTourModal.tsx        # 5-step interactive guided architectural tour
 │   │   └── HelpModal.tsx              # Differential equations & physics specs
 │   ├── lib/
 │   │   ├── physics/
 │   │   │   ├── cartPoleLqr.ts         # CARE Riccati solver, LQR gains, Hurwitz stability
+│   │   │   ├── archetypes.ts          # 6 Cyber-physical industrial archetypes
+│   │   │   ├── kalmanFilter.ts        # Extended Kalman Filter (EKF) observer
 │   │   │   ├── doublePendulum.ts      # Double pendulum chaos & Lyapunov horizon
 │   │   │   ├── fft.ts                 # Fast Fourier Transform & THD calculation
 │   │   │   ├── circleFit.ts           # Kåsa circle-fitting for pivot calibration
@@ -188,6 +214,7 @@ AetherTwin/
 │   │   └── types.ts                   # Strongly typed domain models
 │   └── __tests__/
 │       ├── cartPoleLqr.test.ts        # CARE solver, LQR gains, pole placement tests
+│       ├── kalmanFilter.test.ts       # Extended Kalman Filter covariance & convergence tests
 │       ├── exportUtils.test.ts        # ROS 2, Arduino C++, MATLAB generation tests
 │       ├── fft.test.ts                # FFT frequency extraction & THD tests
 │       ├── doublePendulum.test.ts     # Chaos simulation & Lyapunov horizon tests
@@ -201,6 +228,8 @@ AetherTwin/
 │       ├── apiRoutes.test.ts          # API route response tests
 │       └── liveNetwork.smoke.test.ts  # Live HTTP handshake smoke tests
 ├── APPLICATION.md                     # Meta x Cerebral Valley Hackathon submission blueprint
+├── wrangler.toml                      # Cloudflare Pages & Workers edge configuration
+├── .npmrc                             # CI/CD dependency resolution settings
 ├── .env.example
 ├── tsconfig.json
 ├── tailwind.config.ts
@@ -213,7 +242,7 @@ AetherTwin/
 ## Getting Started
 
 ### Prerequisites
-- **Node.js**: v18.0.0 or later (tested on v24.14.1)
+- **Node.js**: v18.0.0 or later (tested on v20 and v24)
 - **npm**: v9.0.0 or later
 
 ### Installation
