@@ -30,6 +30,11 @@ yarn-error.log*
 # vercel
 .vercel
 
+# brag video generator work artifacts
+/brag-output/
+/brag-repo/
+/brag.zip
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
